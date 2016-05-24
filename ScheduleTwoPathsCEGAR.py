@@ -61,15 +61,18 @@ def addPriorityConstraints(stng, M, s=None):
 
 			for i in range(len(M)):
 				
-				unique_message = [Not(stng.vars.priority(m2,v,i)) for m2 in M if  m2 != m and v in stng.UFSv[m2]]
-				unique_priority = [Not(stng.vars.priority(m,v,j)) for j in range(len(M)) if  j != i]
+				unique_message = [stng.vars.priority(m2,v,i)
+								for m2 in M if  m2 != m and v in stng.UFSv[m2]]
+				unique_priority = [stng.vars.priority(m,v,j)
+								for j in range(len(M)) if  j != i]
 				
-				conjunct = And([And(unique_message),And(unique_priority)])
+				disconjunct = Or([Or(unique_message),Or(unique_priority)])
 				
-				s.add(Implies(stng.vars.priority(m,v,i),conjunct))
+				s.add(Implies(stng.vars.priority(m,v,i),Not(disconjunct)))
 
 			# Every message has at least one priority
-			priority_existence = [stng.vars.priority(m,v,j) for j in range(len(M))]
+			priority_existence = [stng.vars.priority(m,v,j)
+									for j in range(len(M))]
 			s.add(Or(priority_existence))
 
 	return s
@@ -80,7 +83,8 @@ def getModel(s):
 	else:
 		return False
 
-def defineSimulationVariables(stng, M, t, k_omission=0, k_crashes=0, k_delays=0):
+def defineSimulationVariables(stng, M, t,
+	k_omission=0, k_crashes=0, k_delays=0):
 	'''
 	Initiate/Define the following variables for simulating network:
 	-configuration variables
@@ -118,13 +122,14 @@ def defineSimulationVariables(stng, M, t, k_omission=0, k_crashes=0, k_delays=0)
 				stng.vars.def_delay(e,i)
 
 # TODO
-def addSimulationConstraints(stng,s, S, M, t, l, k_omission=0,k_crashes=0,k_delays=0):
+def addSimulationConstraints(stng,s, S, M, t, l,
+	k_omission=0,k_crashes=0,k_delays=0):
 	'''
 	Add simulation contraints to solver s
 	'''
 	return False
 
-def saboteurStrategy(stng, S, M, t, l, 
+def saboteurStrategy(stng, S, M, t, l,
 	k_omission=0, k_crashes=0, k_delays=0):
 	'''
 	Returns a Saboteur stratergy, if any
@@ -154,8 +159,8 @@ def learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=None):
 	'''
 	return False
 
-def CEGAR(stng, M, t, l, 
-	k_omission=0, k_crashes=0, k_delays=0, 
+def CEGAR(stng, M, t, l,
+	k_omission=0, k_crashes=0, k_delays=0,
 	optimize=False, showProgress=False, countFaults=False):
 	'''
 	:param M: The messages to be sent
@@ -191,7 +196,7 @@ def CEGAR(stng, M, t, l,
 		#mdl is has the information about the priorities
 		S = GeneratePriorities(stng, mdl, M)
 
-		crash_mdl = saboteurStrategy(stng, S, M, t, l, 
+		crash_mdl = saboteurStrategy(stng, S, M, t, l,
 			k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays)
 
 		if not crash_mdl:
@@ -203,20 +208,19 @@ def CEGAR(stng, M, t, l,
 			continue
 
 		#redundant: if showProgress:
-		#redundant: 	printProgress(stng, S, M, t, l, 
+		#redundant: 	printProgress(stng, S, M, t, l,
 		#redundant: 		k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays)
 
-		if  learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=S) is False:
+		learnt = learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=S)
+		if  learnt is False:
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
 			
 		#redundant: print 'start check()', time.time()
-		b = s.check()
+		mdl = getModel(s)
 		#redundant: print 'end check()', time.time()
 
-		if b == sat:
-			mdl = s.model()
-		else:
+		if mdl is False:
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
 
@@ -227,7 +231,7 @@ def printProgress(stng, S, M, t, l, k):
 	rest = 0
 
 	mid = (high + low)/2
-	mdl,s = printProgress(stng, S, M, t, mid, 
+	mdl,s = printProgress(stng, S, M, t, mid,
 				k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays, returnSolver=True)
 	while low < high:
 		#redundant: print 'print progress start iteration', time.time()
@@ -279,20 +283,20 @@ def getEdgePriorities(g, FCv, UFSv, M):
 			edge_priority[m][v].append(g(v,v.nextS(m)))
 	return edge_priority
 
-def main(n, m, e, t, l, 
-	k_omission=0, k_crashes=0, k_delays=0, 
-	filename=None, save=False, load=False, 
+def main(n, m, e, t, l,
+	k_omission=0, k_crashes=0, k_delays=0,
+	filename=None, save=False, load=False,
 	optimize=False, showProgress=False, weight=False, countFaults=False):
 
-	(g, M, FCv, FCe, SCv, SCe, UFSv) = GenerateSetting(n, m, e, save=save, 
+	(g, M, FCv, FCe, SCv, SCe, UFSv) = GenerateSetting(n, m, e, save=save,
 		load=load, filename=filename, weight=weight)
 	vars = Vars()
 
 	stng = Glbl(g, vars, FCe, FCv, SCv, SCe, UFSv, getEdgePriorities(g, FCv, UFSv, M))
 	printMessagesInfo(stng, M)
 
-	S = CEGAR(stng, M, t, l, 
-		k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays, 
+	S = CEGAR(stng, M, t, l,
+		k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays,
 		optimize=optimize, showProgress=showProgress, countFaults=countFaults)
 
 	if S == "Timeout":
@@ -371,5 +375,5 @@ if __name__ == '__main__':
 	# main(int(options.n), int(options.m), int(options.e), int(options.t), int(options.l), int(options.k))
 	# main(10, 30, 15, 7, 26, 1, filename, save=True, load=False, optimize=True, showProgress=True, weight=True)
 	exit_status = main(n,m,e,t,l,
-						k_omission=k,filename=filename, save=save, load=load, optimize=optimize, 
-						showProgress=showProgress, weight=weight, countFaults=countFaults)
+		k_omission=k,filename=filename, save=save, load=load, optimize=optimize,
+		showProgress=showProgress, weight=weight, countFaults=countFaults)
