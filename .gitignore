@@ -60,3 +60,10 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+
+# Local Files
+local/*
+*/local/*
+*.curr
+schedules/*
