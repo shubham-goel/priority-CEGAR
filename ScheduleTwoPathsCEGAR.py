@@ -19,15 +19,26 @@ def save_to_file(S,filename):
 	file.close()
 
 def GeneratePriorities(stng, mdl, M):
+	'''
+	Returns (message) priorities such that for every vertex v,
+	priorities[v] is a list of messages ordered in descending message priority
+	'''
+	if not mdl:
+		return mdl
+
 	priorities={}
 	for v in stng.g.V:
-		priorities[v]={}
+		priorities[v]=[]
 
 	for m in M:
 		for v in stng.UFSv[m]:
 			for i in range(len(M)):
 				if is_true(mdl[stng.vars.priority(m,v,i)]):
-					priorities[v][m] = i
+					priorities[v].append((i,m))
+
+	for v in stng.g.V:
+		priorities[v] = sorted(priorities[v], key=lambda student: student[0])
+		priorities[v] = [priorities[v][j][1] for j in range(len(priorities[v]))]
 
 	return priorities
 
@@ -83,6 +94,23 @@ def getModel(s):
 	else:
 		return False
 
+def getUniqueConfigConstr(stng,m,v,i):
+	'''
+	Returns a constraint that guarantees that m is on v at time i, and not on any other vertex.
+	'''
+	notThere = And([Not(stng.vars.config(m, u, i)) for u in stng.UFSv[m] if u != v])
+	here = stng.vars.config(m, v, i)
+	return And(here, notThere)
+
+def getUniqueUsedConstr(stng,m,v,e,i):
+	'''
+	Returns a constraint that guarantees that m at v uses e at time i, and not on any other edge.
+	'''
+	notThere = And([Not(stng.vars.used(m, e1, i)) for e1 in stng.edge_priority[m][v] if e1 != e])
+	here = stng.vars.used(m, e, i)
+	return And(here, notThere)
+
+
 def defineSimulationVariables(stng, M, t,
 	k_omission=0, k_crashes=0, k_delays=0):
 	'''
@@ -98,13 +126,13 @@ def defineSimulationVariables(stng, M, t,
 		
 		for v in stng.UFSv[m]:
 			# is message m at vertex v at time i
-			for i in range(t):
+			for i in range(t+1):
 				stng.vars.def_config(m,v,i)
 
-		for e in stng.FCe[m]:
-			for i in range(len(M)):
-				# is message m using e at i
-				stng.vars.def_used(m,e,i)
+			for e in stng.edge_priority[m][v]:
+				for i in range(t):
+					# is message m using e at i
+					stng.vars.def_used(m,e,i)
 
 		# has message arrived destination
 		stng.vars.def_msgArrive(m)
@@ -112,22 +140,124 @@ def defineSimulationVariables(stng, M, t,
 	for e in stng.g.E:
 		for i in range(t):
 			
+			# Is there an omission fault at e at time i
 			if k_omission>0:
 				stng.vars.def_omit(e,i)
 			
+			# Is there a crash fault at e at time i
 			if k_crashes>0:
 				stng.vars.def_crash(e,i)
 			
+			# Is there a delay fault at e at time i
 			if k_delays>0:
 				stng.vars.def_delay(e,i)
 
+def print_priorities(stng,M):
+	'''
+	print edge priorities
+	'''
+	for m in M:
+		print "Message " + str(m) + " :: {}-->{}".format(str(m.s),str(m.t))
+		print "------------\n"
+
+		for v in stng.UFSv[m]:
+			print "\tvertex : " + str(v)
+			for e in stng.edge_priority[m][v]:
+				print "\t\tEdge "+str(e)
+
+def print_message_priorities(stng,mdl,M):
+	'''
+	print edge priorities
+	'''
+	pr = GeneratePriorities(stng,mdl,M)
+	print "\nMESSAGE PRIORITIES"
+	print "------------------"
+
+	for v in stng.g.V:
+		print "Vertex : " + str(v)
+		for m in pr[v]:
+			print "\tMessage "+str(m)
+
+
 # TODO
-def addSimulationConstraints(stng,s, S, M, t, l,
+def addSimulationConstraints(stng,s, pr, M, t, l,
 	k_omission=0,k_crashes=0,k_delays=0):
 	'''
 	Add simulation contraints to solver s
 	'''
-	return False
+
+	# messages start at their origin
+	for m in M:
+		s.add(getUniqueConfigConstr(stng, m, m.s, 0))
+
+
+	# if a message reaches its destination, it stays there.
+	for m in M:
+		for i in range(t):
+			s.add(Implies(stng.vars.config(m, m.t, i), getUniqueConfigConstr(stng, m, m.t, i+1)))
+
+	for v in stng.g.V:
+		for m in pr[v]:
+
+			lhss = []
+			for i in range(t):
+				lhss.append([])
+
+			for e in stng.edge_priority[m][v]:
+				# assert e.s == v
+				for i in range(t):
+					# No higher priority message uses e
+					mj_e = []
+					for m2 in pr[v]:
+						if m2 == m: break
+						mj_e.append(stng.vars.used_ex(m2,e,i))
+
+					# Message doesnt use higher priority edge
+					m_ej = []
+					for e2 in stng.edge_priority[m][v]:
+						if e2 == e: break
+						m_ej.append(stng.vars.used(m,e2,i))
+
+					pos = stng.vars.config(m,v,i)
+					nocrash = Not(stng.vars.crash(e,i))
+					# Edge e is free according to priorities
+					free_edge = And(Not(Or(mj_e)),Not(Or(m_ej)))
+
+					lhs = And(pos,nocrash,free_edge)
+					s.add(Implies(lhs,getUniqueUsedConstr(stng,m,v,e,i)))
+
+					lhss[i].append(lhs)
+
+			for i in range(t):
+				# No lhs is satisfied
+				no_lhs = Not(Or(lhss[i]))
+				# m doesnt use any edge at i
+				# This implies m stays at v, if it is at vertex v at time i
+				lst = Not(Or([stng.vars.used(m,e,i) for e in stng.edge_priority[m][v]]))
+				s.add(Implies(no_lhs,lst))
+				s.add(Implies(And(lst,stng.vars.config(m,v,i)),getUniqueConfigConstr(stng,m,v,i+1)))
+
+	if k_omission > 0:
+		for m in M:
+			for v in stng.UFSv[m]:
+				for e in stng.edge_priority[m][v]:
+					for i in range(t):
+
+						# If e is omitted, stay where you are. Else, move
+						if_else = If(stng.vars.omit(e,i),
+										getUniqueConfigConstr(stng,m,e.s,i+1),
+										getUniqueConfigConstr(stng,m,e.t,i+1))
+
+						s.add(Implies(stng.vars.used(m,e,i),if_else))
+
+
+		sum_expr = []
+		for e in stng.g.E:
+			for i in range(t):
+				sum_expr.append(If(stng.vars.omit(e,i),1,0))
+		s.add(Sum(sum_expr) <= k_omission)
+
+	s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) < l)
 
 def saboteurStrategy(stng, S, M, t, l,
 	k_omission=0, k_crashes=0, k_delays=0):
@@ -159,6 +289,43 @@ def learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=None):
 	'''
 	return False
 
+
+def excludeOmitCrashModel(stng,s,crash_model,t):
+	crashes = []
+	for e in stng.g.E:
+		for i in range(t):
+			if is_true(crash_model[stng.vars.omit(e,i)]):
+				crashes.append(stng.vars.omit(e,i))
+				break
+	s.add(Not(And(crashes)))
+
+# Count number of fault sequence that performs at most k faults and in which less than l messages arrive
+def count_WFS(stng, pr, M, t, l,
+	k_omission=0,k_crashes=0,k_delays=0):
+	s = Solver()
+
+	defineSimulationVariables(stng, M, t,
+		k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
+
+	addSimulationConstraints(stng, s, pr, M, t, l,
+		k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
+
+	counter = 0
+
+	while True:
+		if s.check() == sat:
+			crash_model = s.model()
+			print "FOUND {}".format(counter)
+			printCounterexample(stng, crash_model, t, M)
+			printConfigurations(stng, crash_model, t, M)
+			counter += 1
+			if k_omission>0:
+				excludeOmitCrashModel(stng,s,crash_model,t)
+		else:
+			break
+
+	return counter
+
 def CEGAR(stng, M, t, l,
 	k_omission=0, k_crashes=0, k_delays=0,
 	optimize=False, showProgress=False, countFaults=False):
@@ -178,12 +345,31 @@ def CEGAR(stng, M, t, l,
 	addPriorityConstraints(stng, M, s=s)
 
 	# Add HERE more heuristics/constraints
-	# for getting good initial priorities
+	# for getting good initial message priorities
 
 	mdl = getModel(s)
 	if not mdl:
 		#redundant: print 'NO valid model EXISTS'
 		return False
+
+	if countFaults:
+		pr = GeneratePriorities(stng, mdl, M)
+		print_message_priorities(stng,mdl,M)
+		print "\n\nCounting Sabeteur Strategies for Schedule now...", time.time()
+		start_time = time.time()
+
+		num_faults = count_WFS(stng, pr, M, t, l,
+				k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
+
+		end_time = time.time()
+		count_time = end_time-start_time
+		print "Number of distinct stratergies = {}\n\n".format(str(num_faults))
+		print "Time taken = {}\n\n".format(str(count_time))
+		print "End Time", time.time()
+		return (num_faults,count_time)
+
+	else:
+		raise ValueError("Only implemented counting of faults")
 
 	while True:
 		#redundant: print j,counter
@@ -193,25 +379,25 @@ def CEGAR(stng, M, t, l,
 		#redundant: if counter > 20:
 			#redundant: return "Timeout"
 
-		#mdl is has the information about the priorities
-		S = GeneratePriorities(stng, mdl, M)
+		#mdl is has the information about the message priorities
+		pr = GeneratePriorities(stng, mdl, M)
 
-		crash_mdl = saboteurStrategy(stng, S, M, t, l,
+		crash_mdl = saboteurStrategy(stng, pr, M, t, l,
 			k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays)
 
 		if not crash_mdl:
 			#redundant: print 'FOUND (k-l) resistant schedule', "k=",','.join([k_omission,k_crashes,k_delays]),"l=",l
-			#redundant: print S
-			#redundant: save_to_file(S,'schedules/Schedule_k'+','.join([k_omission,k_crashes,k_delays])+'_l'+str(l))
+			#redundant: print pr
+			#redundant: save_to_file(pr,'schedules/Schedule_k'+','.join([k_omission,k_crashes,k_delays])+'_l'+str(l))
 			l+=1
 			#redundant: counter=1
 			continue
 
 		#redundant: if showProgress:
-		#redundant: 	printProgress(stng, S, M, t, l,
+		#redundant: 	printProgress(stng, pr, M, t, l,
 		#redundant: 		k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays)
 
-		learnt = learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=S)
+		learnt = learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=pr)
 		if  learnt is False:
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
@@ -278,10 +464,33 @@ def getEdgePriorities(g, FCv, UFSv, M):
 		for v in g.V:
 			edge_priority[m][v] = []
 		for v in FCv[m]:
-			edge_priority[m][v].append(g(v,v.nextF(m)))
+			edge = g(v,v.nextF(m))
+			if edge is not None:
+				edge_priority[m][v].append(edge)
 		for v in UFSv[m]:
-			edge_priority[m][v].append(g(v,v.nextS(m)))
+			edge = g(v,v.nextS(m))
+			if edge is not None:
+				edge_priority[m][v].append(edge)
 	return edge_priority
+
+def printConfiguration(stng, crash_model, t, M, i):
+	for m in M:
+		for v in stng.UFSv[m]:
+			if is_true(crash_model[stng.vars.config(m,v,i)]):
+				print "{} at vertex {} at time {}".format(m,v,i)
+
+def printConfigurations(stng, crash_model, t, M):
+	for i in range(t):
+		print "TIME {}".format(i)
+		printConfiguration(stng, crash_model, t, M, i)
+
+def printCounterexample(stng, mdl, t, M):
+	for e in stng.g.E:
+		for i in range(t):
+			if is_true(mdl[stng.vars.omit(e,i)]):
+				print 'edge: %s omitted at time %d'%(str(e), i)
+				break
+	return
 
 def main(n, m, e, t, l,
 	k_omission=0, k_crashes=0, k_delays=0,
@@ -294,6 +503,7 @@ def main(n, m, e, t, l,
 
 	stng = Glbl(g, vars, FCe, FCv, SCv, SCe, UFSv, getEdgePriorities(g, FCv, UFSv, M))
 	printMessagesInfo(stng, M)
+	print_priorities(stng,M)
 
 	S = CEGAR(stng, M, t, l,
 		k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays,

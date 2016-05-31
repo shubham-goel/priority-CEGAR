@@ -20,14 +20,20 @@ class Vars:
 	def def_config(self, m, v, i):
 		self.vars[(m,v,i,'config')] = Bool('%s is on %s at time %d'%(str(m), str(v), i))
 
-	def config(self, v, m, i):
+	def config(self, m, v, i):
 		return self.vars[(m,v,i,'config')]
 
 	def def_crash(self, e, i):
 		self.vars[(e,i,'crash')] = Bool('%s crashes at time %d'%(str(e), i))
 
 	def crash(self, e, i):
-		return self.vars[(e,i,'crash')]
+		'''
+		Returns False if the variable (e,i,'crash') is not defined
+		'''
+		try:
+			return self.vars[(e,i,'crash')]
+		except KeyError:
+			return False
 
 	def def_delay(self, e, i):
 		self.vars[(e,i,'delay')] = Bool('%s delays at time %d'%(str(e), i))
@@ -46,6 +52,15 @@ class Vars:
 
 	def used(self, m, e, i):
 		return self.vars[(m,e,i,'used')]
+
+	def used_ex(self, m, e, i):
+		'''
+		Returns False if the variable (m,e,i,'used') is not defined
+		'''
+		try:
+			return self.vars[(m,e,i,'used')]
+		except KeyError:
+			return False
 
 	def def_msgArrive(self, m):
 		self.vars[m] = Bool('%s has arrived'%str(m))
@@ -140,7 +155,7 @@ class Message:
 		return self.id == other.id
 
 class Glbl:
-	def __init__(self, g, vars, FCe, FCv, SCv, SCe, UFSv, edgePriority):
+	def __init__(self, g, vars, FCe, FCv, SCv, SCe, UFSv, edge_priority, messages_across=None):
 		self.vars = vars
 		self.g = g
 		self.FCe = FCe
@@ -148,4 +163,4 @@ class Glbl:
 		self.SCv = SCv
 		self.FCv = FCv
 		self.UFSv = UFSv
-		self.edgePriority = edgePriority
+		self.edge_priority = edge_priority
