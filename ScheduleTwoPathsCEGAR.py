@@ -12,6 +12,7 @@ from z3 import *
 
 from Objects import *
 from Graph import GenerateSetting
+from Utilities import *
 
 def save_to_file(S,filename):
 	file = open(filename, 'w')
@@ -49,7 +50,7 @@ def definePriorityVariables(stng, M):
 	for m in M:
 		for v in stng.UFSv[m]:
 			# message m has priority j at vertex v
-			for j in range(t):
+			for j in range(len(M)):
 				stng.vars.def_priority(m,v,j)
 
 def addPriorityConstraints(stng, M, s=None):
@@ -71,14 +72,14 @@ def addPriorityConstraints(stng, M, s=None):
 			unique_priority = []
 
 			for i in range(len(M)):
-				
+
 				unique_message = [stng.vars.priority(m2,v,i)
 								for m2 in M if  m2 != m and v in stng.UFSv[m2]]
 				unique_priority = [stng.vars.priority(m,v,j)
 								for j in range(len(M)) if  j != i]
-				
+
 				disconjunct = Or([Or(unique_message),Or(unique_priority)])
-				
+
 				s.add(Implies(stng.vars.priority(m,v,i),Not(disconjunct)))
 
 			# Every message has at least one priority
@@ -110,9 +111,8 @@ def getUniqueUsedConstr(stng,m,v,e,i):
 	here = stng.vars.used(m, e, i)
 	return And(here, notThere)
 
-
 def defineSimulationVariables(stng, M, t,
-	k_omission=0, k_crashes=0, k_delays=0):
+	k_omissions=0, k_crashes=0, k_delays=0):
 	'''
 	Initiate/Define the following variables for simulating network:
 	-configuration variables
@@ -123,7 +123,7 @@ def defineSimulationVariables(stng, M, t,
 	-omission variables
 	'''
 	for m in M:
-		
+
 		for v in stng.UFSv[m]:
 			# is message m at vertex v at time i
 			for i in range(t+1):
@@ -139,15 +139,15 @@ def defineSimulationVariables(stng, M, t,
 
 	for e in stng.g.E:
 		for i in range(t):
-			
+
 			# Is there an omission fault at e at time i
-			if k_omission>0:
+			if k_omissions>0:
 				stng.vars.def_omit(e,i)
-			
+
 			# Is there a crash fault at e at time i
 			if k_crashes>0:
 				stng.vars.def_crash(e,i)
-			
+
 			# Is there a delay fault at e at time i
 			if k_delays>0:
 				stng.vars.def_delay(e,i)
@@ -178,12 +178,9 @@ def print_message_priorities(stng,mdl,M):
 		for m in pr[v]:
 			print "\tMessage "+str(m)
 
-
-# TODO
-def addSimulationConstraints(stng,s, pr, M, t, l,
-	k_omission=0,k_crashes=0,k_delays=0):
+def generalSimulationConstraints(stng,s, M, t, l, immediatefailure=False):
 	'''
-	Add simulation contraints to solver s
+	Adds constraints that depend neither on k nor on priority model
 	'''
 
 	# messages start at their origin
@@ -195,6 +192,37 @@ def addSimulationConstraints(stng,s, pr, M, t, l,
 	for m in M:
 		for i in range(t):
 			s.add(Implies(stng.vars.config(m, m.t, i), getUniqueConfigConstr(stng, m, m.t, i+1)))
+
+	s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) < l)
+
+
+	for m in M:
+		for v in stng.UFSv[m]:
+			for e in stng.edge_priority[m][v]:
+				for i in range(t):
+
+					# If e is omitted, stay where you are. Else, move
+					if_else = If(stng.vars.omit(e,i),
+									getUniqueConfigConstr(stng,m,e.s,i+1),
+									getUniqueConfigConstr(stng,m,e.t,i+1))
+
+					s.add(Implies(stng.vars.used(m,e,i),if_else))
+
+	for e in stng.g.E:
+		for i in range(t):
+			# once an edge crashes, it stays down
+			if i > 0:
+				s.add(Implies(stng.vars.crash(e, i-1), stng.vars.crash(e, i)))
+
+		#require that if an edge fails, it fails at time 0
+		if immediatefailure:
+			s.add(Implies(stng.vars.crash(e, t-1), stng.vars.crash(e, 0)))
+
+def specificSimulationConstraints(stng,s, pr, M, t, l,
+	k_omissions=0,k_crashes=0,k_delays=0):
+	'''
+	Add simulation contraints specific to pr and not to k
+	'''
 
 	for v in stng.g.V:
 		for m in pr[v]:
@@ -237,42 +265,54 @@ def addSimulationConstraints(stng,s, pr, M, t, l,
 				s.add(Implies(no_lhs,lst))
 				s.add(Implies(And(lst,stng.vars.config(m,v,i)),getUniqueConfigConstr(stng,m,v,i+1)))
 
-	if k_omission > 0:
-		for m in M:
-			for v in stng.UFSv[m]:
-				for e in stng.edge_priority[m][v]:
-					for i in range(t):
+def k_maxSimulationConstraints(stng,s, t, exact=False,
+	k_omissions=0,k_crashes=0,k_delays=0):
+	'''
+	Add constraints specific to k only
+	'''
 
-						# If e is omitted, stay where you are. Else, move
-						if_else = If(stng.vars.omit(e,i),
-										getUniqueConfigConstr(stng,m,e.s,i+1),
-										getUniqueConfigConstr(stng,m,e.t,i+1))
+	# Take care of number of omissions
+	sum_expr = []
+	for e in stng.g.E:
+		for i in range(t):
+			sum_expr.append(If(stng.vars.omit(e,i),1,0))
+	if exact:
+		s.add(Sum(sum_expr) == k_omissions)
+	else:
+		s.add(Sum(sum_expr) <= k_omissions)
 
-						s.add(Implies(stng.vars.used(m,e,i),if_else))
 
+	# Take care of number of crashes
+	if exact:
+		s.add(Sum([If(stng.vars.crash(e,t-1), 1, 0) for e in stng.g.E]) == k_crashes)
+	else:
+		s.add(Sum([If(stng.vars.crash(e,t-1), 1, 0) for e in stng.g.E]) <= k_crashes)
 
-		sum_expr = []
-		for e in stng.g.E:
-			for i in range(t):
-				sum_expr.append(If(stng.vars.omit(e,i),1,0))
-		s.add(Sum(sum_expr) <= k_omission)
-
-	s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) < l)
+	# Take care of number of delays
+	sum_expr = []
+	for e in stng.g.E:
+		for i in range(t):
+			sum_expr.append(If(stng.vars.delay(e,i),1,0))
+	if exact:
+		s.add(Sum(sum_expr) == k_delays)
+	else:
+		s.add(Sum(sum_expr) <= k_delays)
 
 def saboteurStrategy(stng, S, M, t, l,
-	k_omission=0, k_crashes=0, k_delays=0):
+	k_omissions=0, k_crashes=0, k_delays=0):
 	'''
 	Returns a Saboteur stratergy, if any
 	Returns False if no such Stratergy Exists
 	'''
 	# Initiate new solver for network simulation
 	s = Solver()
-	
-	defineSimulationVariables(stng, M, t,
-		k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
 
-	addSimulationConstraints(stng, s, S, M, t, l,
-		k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
+	defineSimulationVariables(stng, M, t,
+		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+	generalSimulationConstraints(stng,s, M, t, l)
+	specificSimulationConstraints(stng, s, S, M, t, l,)
+	k_maxSimulationConstraints(stng,s, t, exact=False,
+		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
 	crash_mdl=getModel(s)
 
@@ -283,32 +323,53 @@ def learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=None):
 	'''
 	Learn constraints from crash_mdl,
 	Add them to solver s
-	
+
 	Return False if no such constraints exist,
 	Then no (k-l) resistant schedules exist
 	'''
 	return False
 
-
-def excludeOmitCrashModel(stng,s,crash_model,t):
+def excludeCrashModel(stng,s,crash_model,t,
+	omissions=False,crashes=False,delays=False):
 	crashes = []
 	for e in stng.g.E:
 		for i in range(t):
-			if is_true(crash_model[stng.vars.omit(e,i)]):
-				crashes.append(stng.vars.omit(e,i))
-				break
+			# omissions
+			if omissions:
+				if is_true(crash_model[stng.vars.omit(e,i)]):
+					crashes.append(stng.vars.omit(e,i))
+				else:
+					crashes.append(Not(stng.vars.omit(e,i)))
+
+			# crashes
+			if crashes:
+				if is_true(crash_model[stng.vars.crash(e,i)]):
+					crashes.append(stng.vars.crash(e,i))
+				else:
+					crashes.append(Not(stng.vars.crash(e,i)))
+
+			# delays
+			if delays:
+				if is_true(crash_model[stng.vars.delay(e,i)]):
+					crashes.append(stng.vars.delay(e,i))
+				else:
+					crashes.append(Not(stng.vars.delay(e,i)))
 	s.add(Not(And(crashes)))
 
-# Count number of fault sequence that performs at most k faults and in which less than l messages arrive
 def count_WFS(stng, pr, M, t, l,
-	k_omission=0,k_crashes=0,k_delays=0):
+	k_omissions=0,k_crashes=0,k_delays=0):
+	'''
+	Count number of fault sequence that performs at most k faults
+	and in which less than l messages arrive
+	'''
 	s = Solver()
 
 	defineSimulationVariables(stng, M, t,
-		k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
-
-	addSimulationConstraints(stng, s, pr, M, t, l,
-		k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
+		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+	generalSimulationConstraints(stng,s, M, t, l)
+	specificSimulationConstraints(stng, s, pr, M, t, l)
+	k_maxSimulationConstraints(stng,s, t, exact=False,
+		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
 	counter = 0
 
@@ -319,16 +380,108 @@ def count_WFS(stng, pr, M, t, l,
 			printCounterexample(stng, crash_model, t, M)
 			printConfigurations(stng, crash_model, t, M)
 			counter += 1
-			if k_omission>0:
-				excludeOmitCrashModel(stng,s,crash_model,t)
+			excludeCrashModel(stng,s,crash_model,t,
+				omissions=(k_omissions>0),crashes=(k_crashes>0),delays=(k_delays>0))
 		else:
 			break
 
 	return counter
 
+def successProb(stng, pr, M, t, l,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	'''
+	Returns the probability of pr failing, given the crash parameters
+	Exactly k_(omissions/crashes/delays) omissions/crashes/delays occur
+	'''
+	s = Solver()
+
+	defineSimulationVariables(stng, M, t,
+		k_omissions=1,k_crashes=1,k_delays=1)
+	generalSimulationConstraints(stng,s, M, t, l)
+	specificSimulationConstraints(stng, s, pr, M, t, l)
+
+	lower_bound=0
+	upper_bound=1
+
+
+	k_omissions=0
+	k_crashes=0
+	k_delays=0
+
+	while True:
+		if AskContinue(lower_bound,upper_bound,k_crashes) is False:
+			break
+
+		# create backtracking point for successive values of k
+		s.push()
+
+
+		k_maxSimulationConstraints(stng,s, t, exact=False,
+			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+
+		p1 = saboteurProbability(stng,s,t,M,
+			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		p2 = crashesProbability(stng,M,t,
+			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+
+		# Update Bounds
+		lower_bound += p2 - p1
+		upper_bound -= p1
+
+		s.pop()
+
+		k_omissions=0
+		k_crashes=k_crashes+1
+		k_delays=0
+
+	return (lower_bound,upper_bound)
+
+def saboteurProbability(stng,s,t,M,
+	k_omissions=0,k_crashes=0,k_delays=0,
+	p_omissions=0,p_crashes=0,p_delays=0):
+
+	checkSupport(k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+
+	crash_data_sum = []
+	while True:
+		if s.check() == sat:
+			crash_model = s.model()
+
+			dat = get_crash_data(stng,crash_model,t,M)
+			sum_i = math.fsum([x[1] for x in dat])
+			crash_data_sum.append(sum_i)
+
+			excludeCrashModel(stng,s,crash_model,t,
+				omissions=(k_omissions>0),crashes=(k_crashes>0),delays=(k_delays>0))
+		else:
+			break
+	return prob_not_AMA(len(stng.g.E),t,
+			p_crashes=p_crashes,k_crashes=k_crashes,k_crashes_list=crash_data_sum)
+
+def crashesProbability(stng,M,t,
+	k_omissions=0,k_crashes=0,k_delays=0,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	'''
+	Returns the probability that exactly k crashes/delays/omissions occur
+	'''
+	checkSupport(k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+
+	num_edges = len(stng.g.E)
+	return prob_crash_parameters(num_edges,t,
+			p_crashes=p_crashes,k_crashes=k_crashes)
+
+def checkSupport(k_omissions=0, k_crashes=0, k_delays=0):
+	if k_delays > 0:
+		raise
+	if k_omissions > 0:
+		raise
+
 def CEGAR(stng, M, t, l,
-	k_omission=0, k_crashes=0, k_delays=0,
-	optimize=False, showProgress=False, countFaults=False):
+	k_omissions=0, k_crashes=0, k_delays=0,
+	optimize=False, showProgress=False, countFaults=False,
+	probabalistic=False):
 	'''
 	:param M: The messages to be sent
 	:param t: The timeout.
@@ -359,7 +512,7 @@ def CEGAR(stng, M, t, l,
 		start_time = time.time()
 
 		num_faults = count_WFS(stng, pr, M, t, l,
-				k_omission=k_omission,k_crashes=k_crashes,k_delays=k_delays)
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
 		end_time = time.time()
 		count_time = end_time-start_time
@@ -368,8 +521,29 @@ def CEGAR(stng, M, t, l,
 		print "End Time", time.time()
 		return (num_faults,count_time)
 
+	elif probabalistic:
+		pr = GeneratePriorities(stng, mdl, M)
+		print_message_priorities(stng,mdl,M)
+
+		p_omissions=0.01
+		p_crashes=0.01
+		p_delays=0.01
+
+		print "\nCalculating Probabilities now...", time.time()
+		start_time = time.time()
+
+		prob = successProb(stng, pr, M, t, l,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+
+		end_time = time.time()
+		count_time = end_time-start_time
+		print "\nProbability Interval = {}\n\n".format(prob)
+		print "Time taken = {}\n\n".format(str(count_time))
+		print "End Time", time.time()
+		return (prob,count_time)
+
 	else:
-		raise ValueError("Only implemented counting of faults")
+		raise ValueError("Only implemented counting of faults and probablistic setting")
 
 	while True:
 		#redundant: print j,counter
@@ -383,25 +557,25 @@ def CEGAR(stng, M, t, l,
 		pr = GeneratePriorities(stng, mdl, M)
 
 		crash_mdl = saboteurStrategy(stng, pr, M, t, l,
-			k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays)
+			k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays)
 
 		if not crash_mdl:
-			#redundant: print 'FOUND (k-l) resistant schedule', "k=",','.join([k_omission,k_crashes,k_delays]),"l=",l
+			#redundant: print 'FOUND (k-l) resistant schedule', "k=",','.join([k_omissions,k_crashes,k_delays]),"l=",l
 			#redundant: print pr
-			#redundant: save_to_file(pr,'schedules/Schedule_k'+','.join([k_omission,k_crashes,k_delays])+'_l'+str(l))
+			#redundant: save_to_file(pr,'schedules/Schedule_k'+','.join([k_omissions,k_crashes,k_delays])+'_l'+str(l))
 			l+=1
 			#redundant: counter=1
 			continue
 
 		#redundant: if showProgress:
 		#redundant: 	printProgress(stng, pr, M, t, l,
-		#redundant: 		k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays)
+		#redundant: 		k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays)
 
 		learnt = learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=pr)
 		if  learnt is False:
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
-			
+
 		#redundant: print 'start check()', time.time()
 		mdl = getModel(s)
 		#redundant: print 'end check()', time.time()
@@ -410,7 +584,6 @@ def CEGAR(stng, M, t, l,
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
 
-
 def printProgress(stng, S, M, t, l, k):
 	low = 0
 	high = l
@@ -418,7 +591,7 @@ def printProgress(stng, S, M, t, l, k):
 
 	mid = (high + low)/2
 	mdl,s = printProgress(stng, S, M, t, mid,
-				k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays, returnSolver=True)
+				k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays, returnSolver=True)
 	while low < high:
 		#redundant: print 'print progress start iteration', time.time()
 		if mdl is False:
@@ -484,18 +657,28 @@ def printConfigurations(stng, crash_model, t, M):
 		print "TIME {}".format(i)
 		printConfiguration(stng, crash_model, t, M, i)
 
+def get_crash_data(stng, mdl, t, M):
+	res = []
+	for e in stng.g.E:
+		for i in range(t):
+			if is_true(mdl[stng.vars.crash(e,i)]):
+				# print 'edge: %s crashed at time %d'%(str(e), i)
+				res.append((e,i))
+				break
+	return res
+
 def printCounterexample(stng, mdl, t, M):
 	for e in stng.g.E:
 		for i in range(t):
 			if is_true(mdl[stng.vars.omit(e,i)]):
 				print 'edge: %s omitted at time %d'%(str(e), i)
-				break
 	return
 
 def main(n, m, e, t, l,
-	k_omission=0, k_crashes=0, k_delays=0,
+	k_omissions=0, k_crashes=0, k_delays=0,
 	filename=None, save=False, load=False,
-	optimize=False, showProgress=False, weight=False, countFaults=False):
+	optimize=False, showProgress=False, weight=False, countFaults=False,
+	probabalistic=False):
 
 	(g, M, FCv, FCe, SCv, SCe, UFSv) = GenerateSetting(n, m, e, save=save,
 		load=load, filename=filename, weight=weight)
@@ -506,8 +689,9 @@ def main(n, m, e, t, l,
 	print_priorities(stng,M)
 
 	S = CEGAR(stng, M, t, l,
-		k_omission=k_omission, k_crashes=k_crashes, k_delays=k_delays,
-		optimize=optimize, showProgress=showProgress, countFaults=countFaults)
+		k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays,
+		optimize=optimize, showProgress=showProgress, countFaults=countFaults,
+		probabalistic=probabalistic)
 
 	if S == "Timeout":
 		print 'Script Timed out'
@@ -548,7 +732,10 @@ def parse_arguments():
 				  help="Check if schedules generated are different")
 	parser.add_option("-c","--count",
 				  action="store_true", dest="countFaults", default=False,
-				  help="Counts number of Sabeteur winning stratergies given Schedule")
+				  help="Counts number of Saboteur winning stratergies given Schedule")
+	parser.add_option("-p","--prob",
+				  action="store_true", dest="probabalistic", default=False,
+				  help="Calculates probability of winning given Runner Stratergy (Priorities)")
 	return parser.parse_args()
 
 def clearFolder(folder):
@@ -556,7 +743,6 @@ def clearFolder(folder):
 	subprocess.call([cmd],shell=True)
 	cmd = "mkdir "+ folder
 	subprocess.call([cmd],shell=True)
-
 
 if __name__ == '__main__':
 	(options, args) = parse_arguments()
@@ -568,6 +754,7 @@ if __name__ == '__main__':
 	weight = options.weight
 	diff = options.diff
 	countFaults = options.countFaults
+	probabalistic = options.probabalistic
 	n = int(sys.argv[1])
 	m = int(sys.argv[2])
 	e = int(sys.argv[3])
@@ -585,5 +772,6 @@ if __name__ == '__main__':
 	# main(int(options.n), int(options.m), int(options.e), int(options.t), int(options.l), int(options.k))
 	# main(10, 30, 15, 7, 26, 1, filename, save=True, load=False, optimize=True, showProgress=True, weight=True)
 	exit_status = main(n,m,e,t,l,
-		k_omission=k,filename=filename, save=save, load=load, optimize=optimize,
-		showProgress=showProgress, weight=weight, countFaults=countFaults)
+		k_omissions=k,filename=filename, save=save, load=load, optimize=optimize,
+		showProgress=showProgress, weight=weight, countFaults=countFaults,
+		probabalistic=probabalistic)

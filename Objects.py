@@ -39,13 +39,25 @@ class Vars:
 		self.vars[(e,i,'delay')] = Bool('%s delays at time %d'%(str(e), i))
 
 	def delay(self, e, i):
-		return self.vars[(e,i,'delay')]
+		'''
+		Returns False if the variable (e,i,'delay') is not defined
+		'''
+		try:
+			return self.vars[(e,i,'delay')]
+		except KeyError:
+			return False
 
 	def def_omit(self, e, i):
 		self.vars[(e,i,'omit')] = Bool('%s omits at time %d'%(str(e), i))
 
 	def omit(self, e, i):
-		return self.vars[(e,i,'omit')]
+		'''
+		Returns False if the variable (e,i,'omit') is not defined
+		'''
+		try:
+			return self.vars[(e,i,'omit')]
+		except KeyError:
+			return False
 
 	def def_used(self, m, e, i):
 		self.vars[(m,e,i,'used')] = Bool('%s is using %s at time %d'%(str(m), str(e), i))
