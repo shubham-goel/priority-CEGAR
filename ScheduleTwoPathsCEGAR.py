@@ -55,6 +55,7 @@ def excludeCrashModel(stng,s,crash_model,t,add_crashes=False,at_t_only=False,
 			if at_t_only:
 				i = t
 
+			assert ((at_t_only is False) or (i==t))
 			# omissions
 			if omissions:
 				if is_true(crash_model[stng.vars.omit(e,i)]):
@@ -115,7 +116,7 @@ def count_WFS(stng, pr, M, t, l,
 
 	return counter
 
-def successProb(stng, pr, M, t, l,
+def successProb(stng, pr, M, t, l,optimize=False,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
 	Returns the probability of pr failing, given the crash parameters
@@ -152,7 +153,7 @@ def successProb(stng, pr, M, t, l,
 		k_maxSimulationConstraints(stng,s, t, exact=True,
 			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
-		p1 = saboteurProbability(stng,s,pr,M,t,l,
+		p1 = saboteurProbability(stng,s,pr,M,t,l,optimize=optimize,
 			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 		p2 = crashesProbability(stng,M,t,
@@ -194,6 +195,9 @@ def saboteurProbability(stng,s,pr,M,t,l,
 				doomed = get_doomed_state(stng, pr, M, t, l,
 							k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
+				if doomed!=t:
+					print "doomed != t. Doomed,t = {},{}".format(doomed,t)
+
 				omitted,crashed,delayed = printCounterexample(stng, crash_model, doomed, M,count=True)
 				p1 = get_model_prob(stng,crash_model,doomed,M,
 						p_crashes=p_crashes,k_crashes=k_crashes)
@@ -209,7 +213,7 @@ def saboteurProbability(stng,s,pr,M,t,l,
 
 				excludeCrashModel(stng,s,crash_model,t,
 					omissions=(k_omissions>0),crashes=(k_crashes>0),delays=(k_delays>0))
-				count += 1
+			count += 1
 		else:
 			break
 	print "Count = {}".format(count)
@@ -222,23 +226,30 @@ def get_doomed_state(stng, pr, M, t, l,
 	All crash models which follow crash_model till time t and have k crashes
 	result in <l messages to be delivered
 	'''
-	sOpt = solver()
+	# print "\nGetting doomed state"
+	sOpt = Solver()
 	defineSimulationVariables(stng, M, t)
 	generalSimulationConstraints(stng,sOpt, M, t, l,l_is_upperBound=False)
 	specificSimulationConstraints(stng, sOpt, pr, M, t, l)
 	k_maxSimulationConstraints(stng,sOpt, t, exact=True,
 		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+	# print "Added Constraints"
 
 	doomed = 0
 
 	while True:
+		# print "doomed=",doomed
 		crash_model = getModel(sOpt)
 		if crash_model is False:
+			# There exists no crash sequence  in which at least l messages arrive
+			# Hence, We have found a doomed state.
 			break
+		assert doomed<=t
 		excludeCrashModel(stng,sOpt,crash_model,doomed,add_crashes=True,at_t_only=True,
 			omissions=True,crashes=True,delays=True)
 		doomed += 1
 
+	# print "Returning doomed state={}\n".format(doomed)
 	return doomed
 
 def CEGAR(stng, M, t, l,
@@ -257,15 +268,17 @@ def CEGAR(stng, M, t, l,
 	s = Solver()
 
 	# Add priority uniqueness constraints
-	definePriorityVariables(stng, M)
+	pr = definePriorityVariables(stng, M, heuristic=True)
+	defineSimulationVariables(stng, M, t)
 	addPriorityConstraints(stng, M, s=s)
 
 	# Add HERE more heuristics/constraints
 	# for getting good initial message priorities
+	prioritySimulationConstraints(stng, s, M, t, pr)
 
 	mdl = getModel(s)
 	if not mdl:
-		#redundant: print 'NO valid model EXISTS'
+		print 'NO valid model EXISTS'
 		return False
 
 	if countFaults:
@@ -295,7 +308,7 @@ def CEGAR(stng, M, t, l,
 		print "\nCalculating Probabilities now...", time.time()
 		start_time = time.time()
 
-		prob = successProb(stng, pr, M, t, l,
+		prob = successProb(stng, pr, M, t, l,optimize=optimize,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
 		end_time = time.time()

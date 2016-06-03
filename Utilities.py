@@ -336,7 +336,7 @@ def printCounterexample(stng, mdl, t, M,count=False):
 # DEFINE VARS
 #############
 
-def definePriorityVariables(stng, M):
+def definePriorityVariables(stng, M, heuristic=None):
 	'''
 	Initaializes/defines message priority variables
 	'''
@@ -345,6 +345,14 @@ def definePriorityVariables(stng, M):
 			# message m has priority j at vertex v
 			for j in range(len(M)):
 				stng.vars.def_priority(m,v,j)
+
+	if heuristic is not None:
+		pr = {}
+		for m in M:
+			pr[m] = {}
+			for v in stng.UFSv[m]:
+				pr[m][v] = Int('priority of {} at vertex {}'.format(str(m),str(v)))
+		return pr
 
 def defineSimulationVariables(stng, M, t):
 	'''

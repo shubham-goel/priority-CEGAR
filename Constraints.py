@@ -14,7 +14,7 @@ from Utilities import *
 # MAJOR
 #######
 
-def generalSimulationConstraints(stng,s, M, t, l,
+def generalSimulationConstraints(stng, s, M, t, l,
 	immediatefailure=False, l_is_upperBound=True):
 	'''
 	Adds constraints that depend neither on k nor on priority model
@@ -57,7 +57,7 @@ def generalSimulationConstraints(stng,s, M, t, l,
 	else:
 		s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) >= l)
 
-def specificSimulationConstraints(stng,s, pr, M, t, l,
+def specificSimulationConstraints(stng, s, pr, M, t, l,
 	k_omissions=0,k_crashes=0,k_delays=0):
 	'''
 	Add simulation contraints specific to pr and not to k
@@ -104,7 +104,7 @@ def specificSimulationConstraints(stng,s, pr, M, t, l,
 				s.add(Implies(no_lhs,lst))
 				s.add(Implies(And(lst,stng.vars.config(m,v,i)),getUniqueConfigConstr(stng,m,v,i+1)))
 
-def k_maxSimulationConstraints(stng,s, t, exact=False,
+def k_maxSimulationConstraints(stng, s, t, exact=False,
 	k_omissions=0,k_crashes=0,k_delays=0):
 	'''
 	Add constraints specific to k only
@@ -173,6 +173,57 @@ def addPriorityConstraints(stng, M, s=None):
 
 	return s
 
+def prioritySimulationConstraints(stng, s, M, t, pr):
+
+	# messages start at their origin
+	for m in M:
+		s.add(getUniqueConfigConstr(stng, m, m.s, 0))
+
+
+	# if a message reaches its destination, it stays there.
+	for m in M:
+		for i in range(t):
+			s.add(Implies(stng.vars.config(m, m.t, i), getUniqueConfigConstr(stng, m, m.t, i+1)))
+
+	# Setting priority Int() vars to have value equal to  priority
+	constraints_pr = []
+	for m in M:
+		for v in stng.UFSv[m]:
+			for j in range(len(M)):
+				constr = (stng.vars.priority(m,v,j) == (pr[m][v]==j))
+				constraints_pr.append(constr)
+	s.add(And(constraints_pr))
+
+	# If m uses e at t, it must be on e.s and e.t at time t and t+1 respectively
+	constraints_pos = []
+	for m in M:
+		for v in stng.UFSv[m]:
+			for e in stng.edge_priority[m][v]:
+				for i in range(t):
+					pos = And(getUniqueConfigConstr(stng,m,e.s,i),getUniqueConfigConstr(stng,m,e.t,i+1))
+					constraints_pos.append(Implies(stng.vars.used(m,e,i),pos))
+	s.add(And(constraints_pos))
+
+	# A lower priority edge is used only if
+	# the higher priority ones are used by a higher priority message
+	constraints_used = []
+	for m in M:
+		for v in stng.UFSv[m]:
+			for i in range(t):
+				hpus = []
+				ors = []
+				for e in stng.edge_priority[m][v]:
+					constr = And(getUniqueUsedConstr(stng,m,v,e,i),And(hpus))
+					ors.append(constr)
+					hpus.append(higher_priority_using(stng,s,pr,M,e,i,m,v))
+				if len(stng.edge_priority[m][v]) >0:
+					e_last = stng.edge_priority[m][v][-1]
+					constr = And(Not(getUniqueUsedConstr(stng,m,v,e_last,i)),And(hpus))
+					ors.append(constr)
+				if len(ors)>0:
+					constraints_used.append(Or(ors))
+	s.add(And(constraints_used))
+
 #######
 # MINOR
 #######
@@ -192,3 +243,17 @@ def getUniqueUsedConstr(stng,m,v,e,i):
 	notThere = And([Not(stng.vars.used(m, e1, i)) for e1 in stng.edge_priority[m][v] if e1 != e])
 	here = stng.vars.used(m, e, i)
 	return And(here, notThere)
+
+def higher_priority_using(stng,s,pr,M,e,t,m,v):
+	'''
+	Returns a constraint equivalent to :
+	There is a message at v, with higher priority than m
+	which is using edge e at t
+	'''
+	there_exists = []
+	for m2 in M:
+		if v in stng.UFSv[m2]: # m2 may arrive at v
+			if e in stng.edge_priority[m2][v]:# m2 may want to travel on e
+				constr = And(stng.vars.used(m2,e,t),pr[m2][v]<pr[m][v])
+				there_exists.append(constr)
+ 	return Or(there_exists)
