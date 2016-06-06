@@ -247,7 +247,7 @@ def get_doomed_state(stng, crash_model, pr, M, t, l,
 def CEGAR(stng, M, t, l,
 	k_omissions=0, k_crashes=0, k_delays=0,
 	optimize=False, showProgress=False, countFaults=False,
-	probabalistic=False):
+	probabalistic=False,load_priority=False,save_priority=False):
 	'''
 	:param M: The messages to be sent
 	:param t: The timeout.
@@ -289,6 +289,12 @@ def CEGAR(stng, M, t, l,
 
 	elif probabalistic:
 		pr = GeneratePriorities(stng, mdl, M)
+
+		if load_priority:
+			pr = load_from_file("priorities.curr")
+		if save_priority:
+			save_to_file(pr,"priorities.curr")
+
 		print_message_priorities(stng,mdl,M)
 
 		p_omissions=0.01
@@ -388,7 +394,7 @@ def main(n, m, e, t, l,
 	S = CEGAR(stng, M, t, l,
 		k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays,
 		optimize=optimize, showProgress=showProgress, countFaults=countFaults,
-		probabalistic=probabalistic)
+		probabalistic=probabalistic,save_priority=save,load_priority=load)
 
 	if S == "Timeout":
 		print 'Script Timed out'

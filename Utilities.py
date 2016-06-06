@@ -183,6 +183,10 @@ def save_to_file(S,filename):
 	pickle.dump(S, file)
 	file.close()
 
+def load_from_file(filename):
+	file = open(filename, 'r')
+	return  pickle.load(file)
+
 def getModel(s):
 	if s.check() == sat:
 		return s.model()
