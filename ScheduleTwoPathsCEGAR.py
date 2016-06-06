@@ -48,12 +48,17 @@ def learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=None):
 
 def excludeCrashModel(stng,s,crash_model,t,add_crashes=False,at_t_only=False,
 	omissions=False,crashes=False,delays=False):
-	exclude_crashes = []
-	for e in stng.g.E:
-		for i in range(t):
+	if at_t_only:
+		begin_time=t
+		end_time=t+1
+	else:
+		begin_time=0
+		end_time=t
 
-			if at_t_only:
-				i = t
+	exclude_crashes = []
+
+	for e in stng.g.E:
+		for i in range(begin_time,end_time):
 
 			assert ((at_t_only is False) or (i==t))
 			# omissions
@@ -76,9 +81,6 @@ def excludeCrashModel(stng,s,crash_model,t,add_crashes=False,at_t_only=False,
 					exclude_crashes.append(stng.vars.delay(e,i))
 				else:
 					exclude_crashes.append(Not(stng.vars.delay(e,i)))
-
-			if at_t_only:
-				break
 
 	if add_crashes:
 		s.add(And(exclude_crashes))
@@ -192,7 +194,7 @@ def saboteurProbability(stng,s,pr,M,t,l,
 			# This part is for permanent crashes only
 			if optimize is True:
 
-				doomed = get_doomed_state(stng, pr, M, t, l,
+				doomed = get_doomed_state(stng, crash_model, pr, M, t, l,
 							k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
 				if doomed!=t:
@@ -219,14 +221,13 @@ def saboteurProbability(stng,s,pr,M,t,l,
 	print "Count = {}".format(count)
 	return prob
 
-def get_doomed_state(stng, pr, M, t, l,
+def get_doomed_state(stng, crash_model, pr, M, t, l,
 	k_omissions=0,k_crashes=0,k_delays=0):
 	'''
 	Returns the smallest time t such that the configuration at t is doomed
 	All crash models which follow crash_model till time t and have k crashes
 	result in <l messages to be delivered
 	'''
-	# print "\nGetting doomed state"
 	sOpt = Solver()
 	defineSimulationVariables(stng, M, t)
 	generalSimulationConstraints(stng,sOpt, M, t, l,l_is_upperBound=False)
@@ -238,9 +239,8 @@ def get_doomed_state(stng, pr, M, t, l,
 	doomed = 0
 
 	while True:
-		# print "doomed=",doomed
-		crash_model = getModel(sOpt)
-		if crash_model is False:
+		temp_crash_model = getModel(sOpt)
+		if temp_crash_model is False:
 			# There exists no crash sequence  in which at least l messages arrive
 			# Hence, We have found a doomed state.
 			break

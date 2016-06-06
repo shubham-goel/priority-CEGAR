@@ -185,6 +185,9 @@ def prioritySimulationConstraints(stng, s, M, t, pr):
 		for i in range(t):
 			s.add(Implies(stng.vars.config(m, m.t, i), getUniqueConfigConstr(stng, m, m.t, i+1)))
 
+	# All messages arrive on time if no crashes occur
+	s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) >= l)
+
 	# Setting priority Int() vars to have value equal to  priority
 	constraints_pr = []
 	for m in M:
@@ -221,7 +224,8 @@ def prioritySimulationConstraints(stng, s, M, t, pr):
 					constr = And(Not(getUniqueUsedConstr(stng,m,v,e_last,i)),And(hpus))
 					ors.append(constr)
 				if len(ors)>0:
-					constraints_used.append(Or(ors))
+					constr = Implies(stng.vars.config(m,v,i),Or(ors))
+					constraints_used.append(constr)
 	s.add(And(constraints_used))
 
 #######
