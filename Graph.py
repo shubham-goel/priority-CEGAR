@@ -1,12 +1,11 @@
 import networkx
 from networkx import NetworkXNoPath
 import random
-from Objects import *
 import itertools
-
 import pickle
-
 import matplotlib.pyplot as plt
+
+from Objects import *
 
 def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None):
 	'''
@@ -21,7 +20,7 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 
 		file.close()
 	else:
-		G = networkx.dense_gnm_random_graph(n, e)
+		G = networkx.gnm_random_graph(n, e, directed=True)
 		M = []
 
 	# Printing Graph
@@ -34,7 +33,7 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 	E = []
 	for e in G.edges_iter():
 		E.append(Edge(V[e[0]], V[e[1]]))
-		E.append(Edge(V[e[1]], V[e[0]]))
+		# E.append(Edge(V[e[1]], V[e[0]]))
 		if weight:
 			G[e[0]][e[1]]['weight'] = 0
 
@@ -136,6 +135,7 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 
 			for u in p[1:]:
 				nextV = V[u]
+				assert g(prev,nextV) != None
 				prev.setNextS(m, nextV)
 
 				if nextV in SCv[m]:

@@ -1,30 +1,56 @@
 from z3 import *
 
+import global_vars as glbl_vars
+
 class Vars:
 	def __init__(self):
 		self.vars = {}
 
 
-	def def_sched(self, m, e, i):
-		self.vars[(m,e,i)] = Bool('%s is scheduled on %s at time %d'%(str(m), str(e), i))
+	def def_sched(self, m, e, i, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s is scheduled on %s at time %d'%(str(m), str(e), i))
+		self.vars[(m,e,i)] = Bool(var_name)
 
 	def sched(self, m, e, i):
 		return self.vars[(m,e,i)]
 
-	def def_priority(self, m, v, j):
-		self.vars[(m,v,j,'priority')] = Bool('%s at %s has priority %d'%(str(m), str(v), j))
+	def def_priority(self, m, v, j, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s at %s has priority %d'%(str(m), str(v), j))
+		self.vars[(m,v,j,'priority')] = Bool(var_name)
 
 	def priority(self, m, v, j):
 		return self.vars[(m,v,j,'priority')]
 
-	def def_config(self, m, v, i):
-		self.vars[(m,v,i,'config')] = Bool('%s is on %s at time %d'%(str(m), str(v), i))
+	def def_config(self, m, v, i, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s is on %s at time %d'%(str(m), str(v), i))
+		self.vars[(m,v,i,'config')] = Bool(var_name)
 
 	def config(self, m, v, i):
 		return self.vars[(m,v,i,'config')]
 
-	def def_crash(self, e, i):
-		self.vars[(e,i,'crash')] = Bool('%s crashes at time %d'%(str(e), i))
+	def def_crash(self, e, i, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s crashes at time %d'%(str(e), i))
+		self.vars[(e,i,'crash')] = Bool(var_name)
 
 	def crash(self, e, i):
 		'''
@@ -35,8 +61,14 @@ class Vars:
 		except KeyError:
 			return False
 
-	def def_delay(self, e, i):
-		self.vars[(e,i,'delay')] = Bool('%s delays at time %d'%(str(e), i))
+	def def_delay(self, e, i, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s delays at time %d'%(str(e), i))
+		self.vars[(e,i,'delay')] = Bool(var_name)
 
 	def delay(self, e, i):
 		'''
@@ -47,8 +79,14 @@ class Vars:
 		except KeyError:
 			return False
 
-	def def_omit(self, e, i):
-		self.vars[(e,i,'omit')] = Bool('%s omits at time %d'%(str(e), i))
+	def def_omit(self, e, i, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s omits at time %d'%(str(e), i))
+		self.vars[(e,i,'omit')] = Bool(var_name)
 
 	def omit(self, e, i):
 		'''
@@ -59,8 +97,14 @@ class Vars:
 		except KeyError:
 			return False
 
-	def def_used(self, m, e, i):
-		self.vars[(m,e,i,'used')] = Bool('%s is using %s at time %d'%(str(m), str(e), i))
+	def def_used(self, m, e, i, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s is using %s at time %d'%(str(m), str(e), i))
+		self.vars[(m,e,i,'used')] = Bool(var_name)
 
 	def used(self, m, e, i):
 		return self.vars[(m,e,i,'used')]
@@ -74,12 +118,17 @@ class Vars:
 		except KeyError:
 			return False
 
-	def def_msgArrive(self, m):
-		self.vars[m] = Bool('%s has arrived'%str(m))
+	def def_msgArrive(self, m, basic_names=False):
+
+		if basic_names:
+			var_name = str(glbl_vars.variable_number)
+			glbl_vars.variable_number += 1
+		else:
+			var_name = ('%s has arrived'%str(m))
+		self.vars[m] = Bool(var_name)
 
 	def msg(self, m):
 		return self.vars[m]
-
 
 class Vertex:
 	def __init__(self, name):
@@ -176,3 +225,30 @@ class Glbl:
 		self.FCv = FCv
 		self.UFSv = UFSv
 		self.edge_priority = edge_priority
+
+class weight_var:
+	def __init__(self, name, p=0, existingVar = None):
+		self.id = name
+		self.name = name
+		if existingVar is None:
+			self.var = Bool('name')
+		else:
+			self.var = existingVar
+		self.weight = p
+
+	def __str__(self):
+		return str(self.var)
+
+	def __lt__(self, m):
+		return self.id < m.id
+
+	def __le__(self, m):
+		return self.id <= m.id
+
+	def __hash__(self):
+		return hash(self.id)
+
+	def __eq__(self, other):
+		if not other:
+			return False
+		return self.id == other.id

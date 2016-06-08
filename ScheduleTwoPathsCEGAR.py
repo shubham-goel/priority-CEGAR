@@ -10,6 +10,7 @@ from optparse import OptionParser
 
 from z3 import *
 
+import global_vars as glbl_vars
 from Objects import *
 from Graph import GenerateSetting
 from Utilities import *
@@ -122,7 +123,6 @@ def successProb(stng, pr, M, t, l,optimize=False,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
 	Returns the probability of pr failing, given the crash parameters
-	Exactly k_(omissions/crashes/delays) omissions/crashes/delays occur
 	'''
 	s = Solver()
 
@@ -176,6 +176,118 @@ def successProb(stng, pr, M, t, l,optimize=False,
 
 	return (lower_bound,upper_bound)
 
+def priorityScore(stng, pr, M, t, l,optimize=False,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	'''
+	Serves the same purpose as successProb
+	Returns the probability of pr failing, given the crash parameters
+	'''
+	s = Goal()
+
+	glbl_vars.variable_number = 1
+
+	defineSimulationVariables(stng, M, t, basic_names=True)
+	generalSimulationConstraints(stng,s, M, t, l)
+	specificSimulationConstraints(stng, s, pr, M, t, l)
+
+	print "setting weight vars...", time.time()
+	weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+
+	print "converting to unweighted...", time.time()
+	denom = wieghted_to_unweighted(stng,s,weight_vars,t,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+
+
+	# Process and save Formula to file
+	glbl_vars.init()
+	filename = "umc_dimacs.txt"
+	# t = Tactic('tseitin-cnf')
+	t = With('tseitin-cnf',distributivity=False)
+	print "cnf to dimacs...", time.time()
+	dimacs = cnf_to_DIMACS(t(s)[0])
+	print "saving dimacs to file...", time.time()
+	save_DIMACS_to_file(dimacs,filename)
+
+	# print normalization_factor,denom
+
+def set_weight_vars(stng, s, M, t,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	print p_omissions,p_crashes,p_delays
+	normalization_factor = 1
+	weight_vars = []
+	for e in stng.g.E:
+		for i in range(t):
+
+			if p_omissions>0:
+				# Omission weight variables
+				ors= []
+				for m in M:
+					ors.append(stng.vars.used_ex(m,e,i))
+				used = Or(ors)
+
+				omit1 = weight_var(glbl_vars.variable_number,p=p_omissions)
+				glbl_vars.variable_number+=1
+				omit2 = weight_var(glbl_vars.variable_number,p=1/(2-p_omissions))
+				glbl_vars.variable_number+=1
+
+				weight_vars.append(omit1)
+				weight_vars.append(omit2)
+
+				s.add(And(used,stng.vars.omit(e,i)) == omit1.var)
+				s.add(And(Not(used),Not(stng.vars.omit(e,i))) == omit2.var)
+
+				normalization_factor *= (1-p_omissions)/(2-p_omissions)
+
+			if p_crashes>0:
+				# Crash Weight Variables
+				if i==0:
+					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
+					glbl_vars.variable_number+=1
+
+					weight_vars.append(crash1)
+					s.add(crash1.var == stng.vars.crash(e,i))
+				else:
+					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
+					glbl_vars.variable_number+=1
+					crash2 = weight_var(glbl_vars.variable_number,p=1/(2-p_crashes))
+					glbl_vars.variable_number+=1
+
+					weight_vars.append(crash1)
+					weight_vars.append(crash2)
+
+					s.add(crash1.var == And(stng.vars.crash(e,i),Not(stng.vars.crash(e,i-1))))
+					s.add(crash2.var == And(stng.vars.crash(e,i),(stng.vars.crash(e,i-1))))
+
+					normalization_factor *= (1-p_crashes)/(2-p_crashes)
+
+	return weight_vars,normalization_factor
+
+def wieghted_to_unweighted(stng,s,weight_vars,t,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	assert p_delays == 0
+	denom = 1
+
+	if p_omissions<=0:
+		for e in stng.g.E:
+			s.add(Not(Or([stng.vars.omit(e,i) for i in range(t)])))
+
+	if p_crashes<=0:
+		for e in stng.g.E:
+			s.add(Not(Or([stng.vars.crash(e,i) for i in range(t)])))
+
+	if p_delays<=0:
+		for e in stng.g.E:
+			s.add(Not(Or([stng.vars.delay(e,i) for i in range(t)])))
+
+	for wv in weight_vars:
+		(bits,expo) = float_dec2bin(wv.weight)
+		cf = new_chain_formula(bits)
+		s.add(wv.var == cf)
+		denom *= 2**expo
+
+	return denom
+
 def saboteurProbability(stng,s,pr,M,t,l,
 	k_omissions=0,k_crashes=0,k_delays=0,
 	p_omissions=0,p_crashes=0,p_delays=0,
@@ -197,8 +309,6 @@ def saboteurProbability(stng,s,pr,M,t,l,
 				doomed = get_doomed_state(stng, crash_model, pr, M, t, l,
 							k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
-				if doomed!=t:
-					print "doomed != t. Doomed,t = {},{}".format(doomed,t)
 
 				omitted,crashed,delayed = printCounterexample(stng, crash_model, doomed, M,count=True)
 				p1 = get_model_prob(stng,crash_model,doomed,M,
@@ -274,7 +384,7 @@ def CEGAR(stng, M, t, l,
 
 	# Add HERE more heuristics/constraints
 	# for getting good initial message priorities
-	prioritySimulationConstraints(stng, s, M, t, pr)
+	prioritySimulationConstraints(stng, s, M, t, pr, l)
 
 	mdl = getModel(s)
 	if not mdl:
@@ -301,20 +411,22 @@ def CEGAR(stng, M, t, l,
 		pr = GeneratePriorities(stng, mdl, M)
 
 		if load_priority:
-			pr = load_from_file("priorities.curr")
+			pr = load_priority_from_file(stng, M, "priorities.curr")
 		if save_priority:
-			save_to_file(pr,"priorities.curr")
+			save_priority_to_file(stng, pr, "priorities.curr")
 
 		print_message_priorities(stng,mdl,M)
 
 		p_omissions=0.01
 		p_crashes=0.01
-		p_delays=0.01
+		p_delays=0
 
 		print "\nCalculating Probabilities now...", time.time()
 		start_time = time.time()
 
-		prob = successProb(stng, pr, M, t, l,optimize=optimize,
+		# prob = successProb(stng, pr, M, t, l,optimize=optimize,
+		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		prob = priorityScore(stng, pr, M, t, l,optimize=optimize,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
 		end_time = time.time()
@@ -414,6 +526,7 @@ def main(n, m, e, t, l,
 		return 0
 
 if __name__ == '__main__':
+	glbl_vars.init()
 	(options, args) = parse_arguments()
 
 	save = not options.load
@@ -437,9 +550,6 @@ if __name__ == '__main__':
 	# Remove old Schedules
 	clearFolder("schedules/")
 
-	# main(n, m, e, t, k, l, filename=None, save=False, load=False, optimize=False, showProgress=False, weight=False):
-	# main(int(options.n), int(options.m), int(options.e), int(options.t), int(options.l), int(options.k))
-	# main(10, 30, 15, 7, 26, 1, filename, save=True, load=False, optimize=True, showProgress=True, weight=True)
 	exit_status = main(n,m,e,t,l,
 		k_crashes=k,filename=filename, save=save, load=load, optimize=optimize,
 		showProgress=showProgress, weight=weight, countFaults=countFaults,

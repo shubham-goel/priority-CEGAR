@@ -10,9 +10,9 @@ from optparse import OptionParser
 
 from z3 import *
 
+import global_vars as glbl_vars
 from Objects import *
 from Graph import GenerateSetting
-from Constraints import *
 
 #############
 # PROBABILITY
@@ -187,6 +187,25 @@ def load_from_file(filename):
 	file = open(filename, 'r')
 	return  pickle.load(file)
 
+def save_priority_to_file(stng, pr, filename):
+	pr_dict = {}
+	for v in stng.g.V:
+		pr_dict[str(v)] = []
+		for m in pr[v]:
+			pr_dict[str(v)].append(str(m))
+
+	print pr_dict
+	save_to_file(pr_dict, filename)
+
+def load_priority_from_file(stng, M, filename):
+	pr_dict = load_from_file(filename)
+	pr = {}
+	for v in stng.g.V:
+		pr[v] = []
+		for m_name in pr_dict[str(v)]:
+			pr[v].append(M[int(m_name)])
+	return pr
+
 def getModel(s):
 	if s.check() == sat:
 		return s.model()
@@ -222,6 +241,23 @@ def GeneratePriorities(stng, mdl, M):
 		priorities[v] = [priorities[v][j][1] for j in range(len(priorities[v]))]
 
 	return priorities
+
+# Ref : https://rosettacode.org/wiki/Decimal_floating_point_number_to_binary#Python
+def float_dec2bin(d, max_len = 10):
+	d = float(d)
+	assert d>0 and d<1
+	if d in glbl_vars.float_dec2bin_dict.keys():
+		return glbl_vars.float_dec2bin_dict[d]
+	hx = float(d).hex()
+	p = hx.index('p')
+	bn = ''.join(glbl_vars.hex2bin.get(char, char) for char in hx[2:p])
+	bin_string = bn.strip('0')
+	if len(bin_string) > max_len:
+		bin_string = bin_string[:max_len].strip('0')
+	exp = int(hx[p+2:]) + len(bin_string.split('.')[1])
+	bin_string = bin_string.split('.')[0] + bin_string.split('.')[1]
+	glbl_vars.float_dec2bin_dict[d] = (bin_string,exp)
+	return bin_string,exp
 
 ##########
 # PRINTING
@@ -334,13 +370,13 @@ def printCounterexample(stng, mdl, t, M,count=False):
 					k_delays += 1
 
 	if count is True:
-		return (k_crashes,k_omissions,k_delays)
+		return (k_omissions,k_crashes,k_delays)
 
 #############
 # DEFINE VARS
 #############
 
-def definePriorityVariables(stng, M, heuristic=None):
+def definePriorityVariables(stng, M, heuristic=None, basic_names=False):
 	'''
 	Initaializes/defines message priority variables
 	'''
@@ -348,7 +384,7 @@ def definePriorityVariables(stng, M, heuristic=None):
 		for v in stng.UFSv[m]:
 			# message m has priority j at vertex v
 			for j in range(len(M)):
-				stng.vars.def_priority(m,v,j)
+				stng.vars.def_priority(m,v,j,basic_names=basic_names)
 
 	if heuristic is not None:
 		pr = {}
@@ -358,7 +394,7 @@ def definePriorityVariables(stng, M, heuristic=None):
 				pr[m][v] = Int('priority of {} at vertex {}'.format(str(m),str(v)))
 		return pr
 
-def defineSimulationVariables(stng, M, t):
+def defineSimulationVariables(stng, M, t, basic_names=False):
 	'''
 	Initiate/Define the following variables for simulating network:
 	-configuration variables
@@ -373,12 +409,12 @@ def defineSimulationVariables(stng, M, t):
 		for v in stng.UFSv[m]:
 			# is message m at vertex v at time i
 			for i in range(t+1):
-				stng.vars.def_config(m,v,i)
+				stng.vars.def_config(m,v,i,basic_names=basic_names)
 
 			for e in stng.edge_priority[m][v]:
 				for i in range(t):
 					# is message m using e at i
-					stng.vars.def_used(m,e,i)
+					stng.vars.def_used(m,e,i,basic_names=basic_names)
 
 		# has message arrived destination
 		stng.vars.def_msgArrive(m)
@@ -387,10 +423,89 @@ def defineSimulationVariables(stng, M, t):
 		for i in range(t):
 
 			# Is there an omission fault at e at time i
-			stng.vars.def_omit(e,i)
+			stng.vars.def_omit(e,i,basic_names=basic_names)
 
 			# Is there a crash fault at e at time i
-			stng.vars.def_crash(e,i)
+			stng.vars.def_crash(e,i,basic_names=basic_names)
 
 			# Is there a delay fault at e at time i
-			stng.vars.def_delay(e,i)
+			stng.vars.def_delay(e,i,basic_names=basic_names)
+
+#########
+# BOOLEAN
+#########
+
+def new_chain_formula(bit_str):
+	ptr = len(bit_str)-1
+	if ptr < 0:
+		raise
+	chain_form = new_unused_variable()
+	ptr -= 1
+	while ptr>0:
+		if bit_str[ptr] == '1':
+			chain_form = Or(chain_form,new_unused_variable())
+		elif bit_str[ptr] == '0':
+			chain_form = And(chain_form,new_unused_variable())
+		else:
+			raise
+		ptr -= 1
+	return chain_form
+
+def new_unused_variable():
+	var = Bool(str(glbl_vars.variable_number))
+	glbl_vars.variable_number += 1
+	return var
+
+########
+# DIMACS
+########
+
+def cnf_to_DIMACS(cnf):
+	# print "FORMULA"
+	# print cnf
+
+	glbl_vars.variable_name_to_number = {}
+	dimacs = []
+	for clause in cnf:
+		dimacs.append(clause_to_DMACS(clause))
+
+	return dimacs
+
+def clause_to_DMACS(clause):
+	clause = str(clause)
+
+	if clause[:3] == "Or(":
+		clause = clause[3:-1]
+	clause = clause.split(", ")
+
+	dmacs_clause = []
+	for literal in clause:
+		neg = False
+		if len(literal) > 5 and literal[:4]=="Not(":
+			literal = literal[4:-1]
+			neg = True
+		if not (literal in glbl_vars.variable_name_to_number.keys()):
+			glbl_vars.variable_name_to_number[literal] = glbl_vars.variable_number
+			glbl_vars.variable_number += 1
+
+		if neg:
+			dmacs_clause.append(-1*glbl_vars.variable_name_to_number[literal])
+		else:
+			dmacs_clause.append(glbl_vars.variable_name_to_number[literal])
+
+	return dmacs_clause
+
+def save_DIMACS_to_file(dimacs, filename):
+	num_vars = glbl_vars.variable_number-1
+	num_clauses = len(dimacs)
+	with open(filename, "w") as f:
+		header = "p cnf {} {}\n".format(num_vars,num_clauses)
+		f.write(header)
+		for clause in dimacs:
+			f.write(format_DIMACS_clause(clause))
+	print "num_vars,num_clauses=",num_vars,num_clauses
+
+def format_DIMACS_clause(clause):
+	formatted = " ".join([str(lit) for lit in clause])
+	formatted = formatted + " 0\n"
+	return formatted

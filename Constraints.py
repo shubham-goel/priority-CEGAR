@@ -6,6 +6,7 @@ from optparse import OptionParser
 
 from z3 import *
 
+import global_vars as glbl_vars
 from Objects import *
 from Graph import GenerateSetting
 from Utilities import *
@@ -162,7 +163,7 @@ def addPriorityConstraints(stng, M, s=None):
 				unique_priority = [stng.vars.priority(m,v,j)
 								for j in range(len(M)) if  j != i]
 
-				disconjunct = Or([Or(unique_message),Or(unique_priority)])
+				disconjunct = Or(Or(unique_message),Or(unique_priority))
 
 				s.add(Implies(stng.vars.priority(m,v,i),Not(disconjunct)))
 
@@ -173,7 +174,7 @@ def addPriorityConstraints(stng, M, s=None):
 
 	return s
 
-def prioritySimulationConstraints(stng, s, M, t, pr):
+def prioritySimulationConstraints(stng, s, M, t, pr, l):
 
 	# messages start at their origin
 	for m in M:
