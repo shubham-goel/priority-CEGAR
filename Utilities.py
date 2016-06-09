@@ -243,7 +243,7 @@ def GeneratePriorities(stng, mdl, M):
 	return priorities
 
 # Ref : https://rosettacode.org/wiki/Decimal_floating_point_number_to_binary#Python
-def float_dec2bin(d, max_len = 10):
+def float_dec2bin(d, max_len = 7):
 	d = float(d)
 	assert d>0 and d<1
 	if d in glbl_vars.float_dec2bin_dict.keys():
@@ -252,11 +252,18 @@ def float_dec2bin(d, max_len = 10):
 	p = hx.index('p')
 	bn = ''.join(glbl_vars.hex2bin.get(char, char) for char in hx[2:p])
 	bin_string = bn.strip('0')
+
+	exp = int(hx[p+2:])
+	assert exp>=len(bin_string.split('.')[0])
+	prefix = ''.join(['0' for i in range(exp-len(bin_string.split('.')[0]))])
+	bin_string = prefix + bin_string.split('.')[0] + bin_string.split('.')[1]
+
 	if len(bin_string) > max_len:
-		bin_string = bin_string[:max_len].strip('0')
-	exp = int(hx[p+2:]) + len(bin_string.split('.')[1])
-	bin_string = bin_string.split('.')[0] + bin_string.split('.')[1]
+		bin_string = bin_string[:max_len].rstrip('0')
+	exp = len(bin_string)
+
 	glbl_vars.float_dec2bin_dict[d] = (bin_string,exp)
+	print "d,bit_str,expo = {},{},{}".format(d,bin_string,exp)
 	return bin_string,exp
 
 ##########
@@ -372,6 +379,11 @@ def printCounterexample(stng, mdl, t, M,count=False):
 	if count is True:
 		return (k_omissions,k_crashes,k_delays)
 
+def print_time(msg):
+	new_time = time.time()
+	print msg,new_time,new_time-glbl_vars.last_time
+	glbl_vars.last_time = new_time
+
 #############
 # DEFINE VARS
 #############
@@ -441,7 +453,7 @@ def new_chain_formula(bit_str):
 		raise
 	chain_form = new_unused_variable()
 	ptr -= 1
-	while ptr>0:
+	while ptr>=0:
 		if bit_str[ptr] == '1':
 			chain_form = Or(chain_form,new_unused_variable())
 		elif bit_str[ptr] == '0':
@@ -452,7 +464,7 @@ def new_chain_formula(bit_str):
 	return chain_form
 
 def new_unused_variable():
-	var = Bool(str(glbl_vars.variable_number))
+	var = Bool('new_var'+str(glbl_vars.variable_number))
 	glbl_vars.variable_number += 1
 	return var
 
@@ -464,7 +476,7 @@ def cnf_to_DIMACS(cnf):
 	# print "FORMULA"
 	# print cnf
 
-	glbl_vars.variable_name_to_number = {}
+	glbl_vars.init()
 	dimacs = []
 	for clause in cnf:
 		dimacs.append(clause_to_DMACS(clause))
@@ -476,10 +488,11 @@ def clause_to_DMACS(clause):
 
 	if clause[:3] == "Or(":
 		clause = clause[3:-1]
-	clause = clause.split(", ")
+	clause = clause.split(",")
 
 	dmacs_clause = []
 	for literal in clause:
+		literal=trim_sides(literal)
 		neg = False
 		if len(literal) > 5 and literal[:4]=="Not(":
 			literal = literal[4:-1]
@@ -509,3 +522,114 @@ def format_DIMACS_clause(clause):
 	formatted = " ".join([str(lit) for lit in clause])
 	formatted = formatted + " 0\n"
 	return formatted
+
+def trim_sides(literal):
+	start=0
+	end=len(literal)
+	undesirables = [' ','\n','\t']
+	while literal[start] in undesirables:
+		start += 1
+	while literal[end-1] in undesirables:
+		end -= 1
+	return literal[start:end]
+
+########
+# WMC
+########
+
+def process_sharpSat_output(sol_file):
+	numSols = None
+	with open(sol_file, "r") as f:
+		status = 0
+		for line in f:
+			if status == 0:
+				if line=="# solutions \n":
+					status += 1
+			elif status == 1:
+				numSols = int(line)
+				status += 1
+			elif status == 2:
+				assert line=="# END\n"
+				status += 1
+			else:
+				break
+		assert (status==3)
+		assert numSols is not None
+	return numSols
+
+def set_weight_vars(stng, s, M, t,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	print p_omissions,p_crashes,p_delays
+	normalization_factor = 1
+	weight_vars = []
+	for e in stng.g.E:
+		for i in range(t):
+
+			if p_omissions>0:
+				# Omission weight variables
+				ors= []
+				for m in M:
+					ors.append(stng.vars.used_ex(m,e,i))
+				used = Or(ors)
+
+				omit1 = weight_var(glbl_vars.variable_number,p=p_omissions)
+				glbl_vars.variable_number+=1
+				omit2 = weight_var(glbl_vars.variable_number,p=1/(2-p_omissions))
+				glbl_vars.variable_number+=1
+
+				weight_vars.append(omit1)
+				weight_vars.append(omit2)
+
+				s.add(And(used,stng.vars.omit(e,i)) == omit1.var)
+				s.add(And(Not(used),Not(stng.vars.omit(e,i))) == omit2.var)
+
+				normalization_factor *= (1-p_omissions)/(2-p_omissions)
+
+			if p_crashes>0:
+				# Crash Weight Variables
+				if i==0:
+					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
+					glbl_vars.variable_number+=1
+
+					weight_vars.append(crash1)
+					s.add(crash1.var == stng.vars.crash(e,i))
+				else:
+					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
+					glbl_vars.variable_number+=1
+					crash2 = weight_var(glbl_vars.variable_number,p=1/(2-p_crashes))
+					glbl_vars.variable_number+=1
+
+					weight_vars.append(crash1)
+					weight_vars.append(crash2)
+
+					s.add(crash1.var == And(stng.vars.crash(e,i),Not(stng.vars.crash(e,i-1))))
+					s.add(crash2.var == And(stng.vars.crash(e,i),(stng.vars.crash(e,i-1))))
+
+					normalization_factor *= (1-p_crashes)/(2-p_crashes)
+
+	return weight_vars,normalization_factor
+
+def wieghted_to_unweighted(stng,s,weight_vars,t,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	assert p_delays == 0
+	denom = 1
+
+	if p_omissions<=0:
+		for e in stng.g.E:
+			s.add(Not(Or([stng.vars.omit(e,i) for i in range(t)])))
+
+	if p_crashes<=0:
+		for e in stng.g.E:
+			s.add(Not(Or([stng.vars.crash(e,i) for i in range(t)])))
+
+	if p_delays<=0:
+		for e in stng.g.E:
+			s.add(Not(Or([stng.vars.delay(e,i) for i in range(t)])))
+
+	for wv in weight_vars:
+		(bits,expo) = float_dec2bin(wv.weight)
+		cf = new_chain_formula(bits)
+		s.add(wv.var == cf)
+		denom *= 2**expo
+
+	return denom

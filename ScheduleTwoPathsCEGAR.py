@@ -6,7 +6,9 @@ import time
 import pickle
 import itertools
 import subprocess
+import math
 from optparse import OptionParser
+from decimal import Decimal
 
 from z3 import *
 
@@ -182,111 +184,58 @@ def priorityScore(stng, pr, M, t, l,optimize=False,
 	Serves the same purpose as successProb
 	Returns the probability of pr failing, given the crash parameters
 	'''
+	assert l==len(M)
 	s = Goal()
 
-	glbl_vars.variable_number = 1
+	glbl_vars.init()
 
-	defineSimulationVariables(stng, M, t, basic_names=True)
-	generalSimulationConstraints(stng,s, M, t, l)
+	print_time("Simulating network...")
+	defineSimulationVariables(stng, M, t, basic_names=False)
+	generalSimulationConstraints(stng,s, M, t, l, l_is_upperBound=False)
 	specificSimulationConstraints(stng, s, pr, M, t, l)
 
-	print "setting weight vars...", time.time()
+	print_time("setting weight vars...")
 	weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
-	print "converting to unweighted...", time.time()
+	print_time("converting to unweighted...")
 	denom = wieghted_to_unweighted(stng,s,weight_vars,t,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
+	print "denom = 2**{}".format(math.log(denom,2))
+	print "normalization_factor = {}".format(normalization_factor)
 
 	# Process and save Formula to file
 	glbl_vars.init()
-	filename = "umc_dimacs.txt"
+	cnf_file = "umc_dimacs.txt"
+	sol_file = "num_sols.txt"
 	# t = Tactic('tseitin-cnf')
 	t = With('tseitin-cnf',distributivity=False)
-	print "cnf to dimacs...", time.time()
+	print_time("cnf to dimacs...")
 	dimacs = cnf_to_DIMACS(t(s)[0])
-	print "saving dimacs to file...", time.time()
-	save_DIMACS_to_file(dimacs,filename)
+	print_time("saving dimacs to file...")
+	save_DIMACS_to_file(dimacs,cnf_file)
 
-	# print normalization_factor,denom
+	# Run SharpSat on file
+	print_time("running SharpSat on file...")
+	cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
+	if subprocess.call([cmd],shell=True) == 1 :
+		print("Exit Status error!")
+	else:
+		print("SUCCESS!")
 
-def set_weight_vars(stng, s, M, t,
-	p_omissions=0,p_crashes=0,p_delays=0):
-	print p_omissions,p_crashes,p_delays
-	normalization_factor = 1
-	weight_vars = []
-	for e in stng.g.E:
-		for i in range(t):
+	# Process SharpSat output to get #Sols
+	print_time("reading SharpSat's output...")
+	numSols = process_sharpSat_output(sol_file)
 
-			if p_omissions>0:
-				# Omission weight variables
-				ors= []
-				for m in M:
-					ors.append(stng.vars.used_ex(m,e,i))
-				used = Or(ors)
+	denom = Decimal(normalization_factor)*Decimal(denom)
+	prob = Decimal(numSols)/denom
+	print "\n\n"
+	print "numSols = {}".format(numSols)
+	print "denom = {}".format(denom)
+	print "prob = {}".format(+prob)
 
-				omit1 = weight_var(glbl_vars.variable_number,p=p_omissions)
-				glbl_vars.variable_number+=1
-				omit2 = weight_var(glbl_vars.variable_number,p=1/(2-p_omissions))
-				glbl_vars.variable_number+=1
-
-				weight_vars.append(omit1)
-				weight_vars.append(omit2)
-
-				s.add(And(used,stng.vars.omit(e,i)) == omit1.var)
-				s.add(And(Not(used),Not(stng.vars.omit(e,i))) == omit2.var)
-
-				normalization_factor *= (1-p_omissions)/(2-p_omissions)
-
-			if p_crashes>0:
-				# Crash Weight Variables
-				if i==0:
-					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
-					glbl_vars.variable_number+=1
-
-					weight_vars.append(crash1)
-					s.add(crash1.var == stng.vars.crash(e,i))
-				else:
-					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
-					glbl_vars.variable_number+=1
-					crash2 = weight_var(glbl_vars.variable_number,p=1/(2-p_crashes))
-					glbl_vars.variable_number+=1
-
-					weight_vars.append(crash1)
-					weight_vars.append(crash2)
-
-					s.add(crash1.var == And(stng.vars.crash(e,i),Not(stng.vars.crash(e,i-1))))
-					s.add(crash2.var == And(stng.vars.crash(e,i),(stng.vars.crash(e,i-1))))
-
-					normalization_factor *= (1-p_crashes)/(2-p_crashes)
-
-	return weight_vars,normalization_factor
-
-def wieghted_to_unweighted(stng,s,weight_vars,t,
-	p_omissions=0,p_crashes=0,p_delays=0):
-	assert p_delays == 0
-	denom = 1
-
-	if p_omissions<=0:
-		for e in stng.g.E:
-			s.add(Not(Or([stng.vars.omit(e,i) for i in range(t)])))
-
-	if p_crashes<=0:
-		for e in stng.g.E:
-			s.add(Not(Or([stng.vars.crash(e,i) for i in range(t)])))
-
-	if p_delays<=0:
-		for e in stng.g.E:
-			s.add(Not(Or([stng.vars.delay(e,i) for i in range(t)])))
-
-	for wv in weight_vars:
-		(bits,expo) = float_dec2bin(wv.weight)
-		cf = new_chain_formula(bits)
-		s.add(wv.var == cf)
-		denom *= 2**expo
-
-	return denom
+	return +prob
 
 def saboteurProbability(stng,s,pr,M,t,l,
 	k_omissions=0,k_crashes=0,k_delays=0,
@@ -378,14 +327,19 @@ def CEGAR(stng, M, t, l,
 	s = Solver()
 
 	# Add priority uniqueness constraints
+	print_time("defining priority vars...")
 	pr = definePriorityVariables(stng, M, heuristic=True)
+	print_time("defining simulation vars...")
 	defineSimulationVariables(stng, M, t)
-	addPriorityConstraints(stng, M, s=s)
+	print_time("adding priority constraints...")
+	addPriorityConstraints(stng, M, s=s) #BOTTLENECK1
 
 	# Add HERE more heuristics/constraints
 	# for getting good initial message priorities
+	print_time("implementing heuristic...")
 	prioritySimulationConstraints(stng, s, M, t, pr, l)
 
+	print_time("solving z3 program...")
 	mdl = getModel(s)
 	if not mdl:
 		print 'NO valid model EXISTS'
@@ -394,7 +348,7 @@ def CEGAR(stng, M, t, l,
 	if countFaults:
 		pr = GeneratePriorities(stng, mdl, M)
 		print_message_priorities(stng,mdl,M)
-		print "\n\nCounting Sabeteur Strategies for Schedule now...", time.time()
+		print_time("\n\nCounting Sabeteur Strategies for Schedule now...")
 		start_time = time.time()
 
 		num_faults = count_WFS(stng, pr, M, t, l,
@@ -408,20 +362,21 @@ def CEGAR(stng, M, t, l,
 		return (num_faults,count_time)
 
 	elif probabalistic:
+		print_time("generating priorities...")
 		pr = GeneratePriorities(stng, mdl, M)
 
-		if load_priority:
-			pr = load_priority_from_file(stng, M, "priorities.curr")
-		if save_priority:
-			save_priority_to_file(stng, pr, "priorities.curr")
+		# if load_priority:
+		# 	pr = load_priority_from_file(stng, M, "priorities.curr")
+		# if save_priority:
+		# 	save_priority_to_file(stng, pr, "priorities.curr")
 
-		print_message_priorities(stng,mdl,M)
+		# print_message_priorities(stng,mdl,M)
 
 		p_omissions=0.01
 		p_crashes=0.01
 		p_delays=0
 
-		print "\nCalculating Probabilities now...", time.time()
+		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
 
 		# prob = successProb(stng, pr, M, t, l,optimize=optimize,
@@ -505,14 +460,17 @@ def main(n, m, e, t, l,
 	optimize=False, showProgress=False, weight=False, countFaults=False,
 	probabalistic=False):
 
+	print_time("generating setting...")
 	(g, M, FCv, FCe, SCv, SCe, UFSv) = GenerateSetting(n, m, e, save=save,
 		load=load, filename=filename, weight=weight)
 	vars = Vars()
 
 	stng = Glbl(g, vars, FCe, FCv, SCv, SCe, UFSv, getEdgePriorities(g, FCv, UFSv, M))
-	printMessagesInfo(stng, M)
-	print_priorities(stng,M)
+	# printMessagesInfo(stng, M)
+	# print "\n"
+	# print_priorities(stng,M)
 
+	print_time("Starting Cegar loop...")
 	S = CEGAR(stng, M, t, l,
 		k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays,
 		optimize=optimize, showProgress=showProgress, countFaults=countFaults,
@@ -527,6 +485,8 @@ def main(n, m, e, t, l,
 
 if __name__ == '__main__':
 	glbl_vars.init()
+	glbl_vars.last_time = time.time()
+
 	(options, args) = parse_arguments()
 
 	save = not options.load

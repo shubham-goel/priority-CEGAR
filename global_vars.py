@@ -1,4 +1,5 @@
 def init():
+	global last_time
 	global variable_number
 	global variable_name_to_number
 	global hex2bin

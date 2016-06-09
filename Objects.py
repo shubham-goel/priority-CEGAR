@@ -13,7 +13,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s is scheduled on %s at time %d'%(str(m), str(e), i))
+			var_name = ('m%s is scheduled on e%s at time t%d'%(str(m), str(e), i))
 		self.vars[(m,e,i)] = Bool(var_name)
 
 	def sched(self, m, e, i):
@@ -25,7 +25,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s at %s has priority %d'%(str(m), str(v), j))
+			var_name = ('m%s at v%s has priority %d'%(str(m), str(v), j))
 		self.vars[(m,v,j,'priority')] = Bool(var_name)
 
 	def priority(self, m, v, j):
@@ -37,7 +37,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s is on %s at time %d'%(str(m), str(v), i))
+			var_name = ('m%s is on v%s at time %d'%(str(m), str(v), i))
 		self.vars[(m,v,i,'config')] = Bool(var_name)
 
 	def config(self, m, v, i):
@@ -49,7 +49,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s crashes at time %d'%(str(e), i))
+			var_name = ('e%s crashes at time %d'%(str(e), i))
 		self.vars[(e,i,'crash')] = Bool(var_name)
 
 	def crash(self, e, i):
@@ -67,7 +67,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s delays at time %d'%(str(e), i))
+			var_name = ('e%s delays at time %d'%(str(e), i))
 		self.vars[(e,i,'delay')] = Bool(var_name)
 
 	def delay(self, e, i):
@@ -85,7 +85,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s omits at time %d'%(str(e), i))
+			var_name = ('e%s omits at time %d'%(str(e), i))
 		self.vars[(e,i,'omit')] = Bool(var_name)
 
 	def omit(self, e, i):
@@ -103,7 +103,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s is using %s at time %d'%(str(m), str(e), i))
+			var_name = ('m%s is using e%s at time %d'%(str(m), str(e), i))
 		self.vars[(m,e,i,'used')] = Bool(var_name)
 
 	def used(self, m, e, i):
@@ -124,7 +124,7 @@ class Vars:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
 		else:
-			var_name = ('%s has arrived'%str(m))
+			var_name = ('m%s has arrived'%str(m))
 		self.vars[m] = Bool(var_name)
 
 	def msg(self, m):
@@ -172,7 +172,7 @@ class Edge:
 		self.t = t
 
 	def __str__(self):
-		return '(%s, %s)'%(self.s, self.t)
+		return '(%s-%s)'%(self.s, self.t)
 
 	def __hash__(self):
 		return hash((hash(self.s), hash(self.t)))
@@ -227,13 +227,10 @@ class Glbl:
 		self.edge_priority = edge_priority
 
 class weight_var:
-	def __init__(self, name, p=0, existingVar = None):
+	def __init__(self, name, p=0):
 		self.id = name
 		self.name = name
-		if existingVar is None:
-			self.var = Bool('name')
-		else:
-			self.var = existingVar
+		self.var = Bool('WV_'+str(name))
 		self.weight = p
 
 	def __str__(self):

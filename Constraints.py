@@ -33,8 +33,8 @@ def generalSimulationConstraints(stng, s, M, t, l,
 
 	for m in M:
 		for v in stng.UFSv[m]:
-			for e in stng.edge_priority[m][v]:
-				for i in range(t):
+			for i in range(t):
+				for e in stng.edge_priority[m][v]:
 
 					# If e is omitted, stay where you are. Else, move
 					if_else = If(stng.vars.omit(e,i),
@@ -42,6 +42,13 @@ def generalSimulationConstraints(stng, s, M, t, l,
 									getUniqueConfigConstr(stng,m,e.t,i+1))
 
 					s.add(Implies(stng.vars.used(m,e,i),if_else))
+
+				m_uses_e = []
+				for e in stng.edge_priority[m][v]:
+					m_uses_e.append(stng.vars.used(m,e,i))
+				sitting_duck = And(Not(Or(m_uses_e)),stng.vars.config(m,v,i))
+				s.add(Implies(sitting_duck, getUniqueConfigConstr(stng, m, v, i)))
+
 
 	for e in stng.g.E:
 		for i in range(t):
@@ -53,10 +60,32 @@ def generalSimulationConstraints(stng, s, M, t, l,
 		if immediatefailure:
 			s.add(Implies(stng.vars.crash(e, t-1), stng.vars.crash(e, 0)))
 
-	if l_is_upperBound:
-		s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) < l)
+	# No omission takes place if no message is travelling on link
+	for e in stng.g.E:
+		for i in range(t):
+			ors = []
+			for m in M:
+				ors.append(stng.vars.used_ex(m,e,i))
+			s.add(Implies(Not(Or(ors)),Not(stng.vars.omit(e,i))))
+
+	# Uniqueness of edge usage
+	for i in range(t):
+		for m in M:
+			for v in stng.UFSv[m]:
+				for e in stng.edge_priority[m][v]:
+					m2_uses_e = Or([stng.vars.used_ex(m2,e,i) for m2 in M if m2!=m])
+					m_uses_e2 = Or([stng.vars.used_ex(m,e2,i) for e2 in stng.g.E if e2!=e])
+					s.add(Implies(stng.vars.used(m,e,i),Not(Or(m2_uses_e,m_uses_e2))))
+
+	if l==len(M):
+		constr = And([getUniqueConfigConstr(stng, m, m.t, t) for m in M])
 	else:
-		s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) >= l)
+		constr = (Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) >= l)
+
+	if l_is_upperBound:
+		s.add(Not(constr))
+	else:
+		s.add(constr)
 
 def specificSimulationConstraints(stng, s, pr, M, t, l,
 	k_omissions=0,k_crashes=0,k_delays=0):
@@ -72,7 +101,7 @@ def specificSimulationConstraints(stng, s, pr, M, t, l,
 				lhss.append([])
 
 			for e in stng.edge_priority[m][v]:
-				# assert e.s == v
+				assert e.s == v
 				for i in range(t):
 					# No higher priority message uses e
 					mj_e = []
@@ -92,7 +121,7 @@ def specificSimulationConstraints(stng, s, pr, M, t, l,
 					free_edge = And(Not(Or(mj_e)),Not(Or(m_ej)))
 
 					lhs = And(pos,nocrash,free_edge)
-					s.add(Implies(lhs,getUniqueUsedConstr(stng,m,v,e,i)))
+					s.add(Implies(lhs,stng.vars.used(m,e,i)))
 
 					lhss[i].append(lhs)
 
@@ -201,9 +230,9 @@ def prioritySimulationConstraints(stng, s, M, t, pr, l):
 	# If m uses e at t, it must be on e.s and e.t at time t and t+1 respectively
 	constraints_pos = []
 	for m in M:
-		for v in stng.UFSv[m]:
-			for e in stng.edge_priority[m][v]:
-				for i in range(t):
+		for i in range(t):
+			for v in stng.UFSv[m]:
+				for e in stng.edge_priority[m][v]:
 					pos = And(getUniqueConfigConstr(stng,m,e.s,i),getUniqueConfigConstr(stng,m,e.t,i+1))
 					constraints_pos.append(Implies(stng.vars.used(m,e,i),pos))
 	s.add(And(constraints_pos))
