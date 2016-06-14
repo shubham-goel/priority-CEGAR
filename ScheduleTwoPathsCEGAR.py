@@ -472,9 +472,9 @@ def CEGAR(stng, M, t, l,
 		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
 
-		# prob = successProb(stng, pr, M, t, l,optimize=optimize,
+		# prob = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
 		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob = priorityScore(stng, pr, M, t, l,optimize=optimize,
+		prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
 		end_time = time.time()
