@@ -237,6 +237,16 @@ def prioritySimulationConstraints(stng, s, M, t, pr, l):
 					constraints_pos.append(Implies(stng.vars.used(m,e,i),pos))
 	s.add(And(constraints_pos))
 
+	# Uniqueness of edge usage
+	for i in range(t):
+		for m in M:
+			for v in stng.UFSv[m]:
+				for e in stng.edge_priority[m][v]:
+					m2_uses_e = Or([stng.vars.used_ex(m2,e,i) for m2 in M if m2!=m])
+					m_uses_e2 = Or([stng.vars.used_ex(m,e2,i) for e2 in stng.g.E if e2!=e])
+					s.add(Implies(stng.vars.used(m,e,i),Not(Or(m2_uses_e,m_uses_e2))))
+
+
 	# A lower priority edge is used only if
 	# the higher priority ones are used by a higher priority message
 	constraints_used = []

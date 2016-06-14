@@ -243,7 +243,7 @@ def GeneratePriorities(stng, mdl, M):
 	return priorities
 
 # Ref : https://rosettacode.org/wiki/Decimal_floating_point_number_to_binary#Python
-def float_dec2bin(d, max_len = 7):
+def float_dec2bin(d, max_len = 25):
 	d = float(d)
 	assert d>0 and d<1
 	if d in glbl_vars.float_dec2bin_dict.keys():
@@ -265,6 +265,22 @@ def float_dec2bin(d, max_len = 7):
 	glbl_vars.float_dec2bin_dict[d] = (bin_string,exp)
 	print "d,bit_str,expo = {},{},{}".format(d,bin_string,exp)
 	return bin_string,exp
+
+def reduce_precision(p,precision):
+	if p==0:
+		return 0
+	elif p==1:
+		return 1
+	bin_str,expo= float_dec2bin(p,max_len=precision)
+	number = 0
+	power = 1
+	for i in range(expo):
+		power /= 2.0
+		if bin_str[i] == '1':
+			number += power
+	print "returning",number
+	return number
+
 
 ##########
 # PRINTING
@@ -365,6 +381,7 @@ def printCounterexample(stng, mdl, t, M,count=False):
 			if is_true(mdl[stng.vars.crash(e,i)]):
 				if count is False:
 					print 'edge: %s crashed at time %d'%(str(e), i)
+					break
 				else:
 					k_crashes += 1
 				break
@@ -497,6 +514,7 @@ def clause_to_DMACS(clause):
 		if len(literal) > 5 and literal[:4]=="Not(":
 			literal = literal[4:-1]
 			neg = True
+		literal=trim_sides(literal)
 		if not (literal in glbl_vars.variable_name_to_number.keys()):
 			glbl_vars.variable_name_to_number[literal] = glbl_vars.variable_number
 			glbl_vars.variable_number += 1
@@ -557,11 +575,15 @@ def process_sharpSat_output(sol_file):
 		assert numSols is not None
 	return numSols
 
-def set_weight_vars(stng, s, M, t,
+def set_weight_vars(stng, s, M, t,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	print p_omissions,p_crashes,p_delays
 	normalization_factor = 1
 	weight_vars = []
+	p_omissions1 = reduce_precision(p_omissions,precision)
+	p_omissions2 = reduce_precision(1/(2-p_omissions),precision)
+	p_crashes1 = reduce_precision(p_crashes,precision)
+	p_crashes2 = reduce_precision(1/(2-p_crashes),precision)
 	for e in stng.g.E:
 		for i in range(t):
 
@@ -572,9 +594,9 @@ def set_weight_vars(stng, s, M, t,
 					ors.append(stng.vars.used_ex(m,e,i))
 				used = Or(ors)
 
-				omit1 = weight_var(glbl_vars.variable_number,p=p_omissions)
+				omit1 = weight_var(glbl_vars.variable_number,p=p_omissions1)
 				glbl_vars.variable_number+=1
-				omit2 = weight_var(glbl_vars.variable_number,p=1/(2-p_omissions))
+				omit2 = weight_var(glbl_vars.variable_number,p=p_omissions2)
 				glbl_vars.variable_number+=1
 
 				weight_vars.append(omit1)
@@ -583,20 +605,20 @@ def set_weight_vars(stng, s, M, t,
 				s.add(And(used,stng.vars.omit(e,i)) == omit1.var)
 				s.add(And(Not(used),Not(stng.vars.omit(e,i))) == omit2.var)
 
-				normalization_factor *= (1-p_omissions)/(2-p_omissions)
+				normalization_factor *= (1-p_omissions1)*p_omissions2
 
 			if p_crashes>0:
 				# Crash Weight Variables
 				if i==0:
-					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
+					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes1)
 					glbl_vars.variable_number+=1
 
 					weight_vars.append(crash1)
 					s.add(crash1.var == stng.vars.crash(e,i))
 				else:
-					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes)
+					crash1 = weight_var(glbl_vars.variable_number,p=p_crashes1)
 					glbl_vars.variable_number+=1
-					crash2 = weight_var(glbl_vars.variable_number,p=1/(2-p_crashes))
+					crash2 = weight_var(glbl_vars.variable_number,p=p_crashes2)
 					glbl_vars.variable_number+=1
 
 					weight_vars.append(crash1)
@@ -605,7 +627,7 @@ def set_weight_vars(stng, s, M, t,
 					s.add(crash1.var == And(stng.vars.crash(e,i),Not(stng.vars.crash(e,i-1))))
 					s.add(crash2.var == And(stng.vars.crash(e,i),(stng.vars.crash(e,i-1))))
 
-					normalization_factor *= (1-p_crashes)/(2-p_crashes)
+					normalization_factor *= (1-p_crashes1)*p_crashes2
 
 	return weight_vars,normalization_factor
 

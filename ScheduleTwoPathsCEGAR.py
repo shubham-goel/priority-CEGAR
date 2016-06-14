@@ -178,7 +178,7 @@ def successProb(stng, pr, M, t, l,optimize=False,
 
 	return (lower_bound,upper_bound)
 
-def priorityScore(stng, pr, M, t, l,optimize=False,
+def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
 	Serves the same purpose as successProb
@@ -195,7 +195,7 @@ def priorityScore(stng, pr, M, t, l,optimize=False,
 	specificSimulationConstraints(stng, s, pr, M, t, l)
 
 	print_time("setting weight vars...")
-	weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,
+	weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,precision=precision,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
 	print_time("converting to unweighted...")
@@ -212,7 +212,9 @@ def priorityScore(stng, pr, M, t, l,optimize=False,
 	# t = Tactic('tseitin-cnf')
 	t = With('tseitin-cnf',distributivity=False)
 	print_time("cnf to dimacs...")
-	dimacs = cnf_to_DIMACS(t(s)[0])
+	cnf = t(s)[0]
+	print "Number of clauses = ",len(cnf)
+	dimacs = cnf_to_DIMACS(cnf)
 	print_time("saving dimacs to file...")
 	save_DIMACS_to_file(dimacs,cnf_file)
 
@@ -372,9 +374,14 @@ def CEGAR(stng, M, t, l,
 
 		# print_message_priorities(stng,mdl,M)
 
-		p_omissions=0.01
+		p_omissions=0
 		p_crashes=0.01
 		p_delays=0
+		precision=7
+
+		p_omissions=reduce_precision(p_omissions,precision)
+		p_crashes=reduce_precision(p_crashes,precision)
+		p_delays=reduce_precision(p_delays,precision)
 
 		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
