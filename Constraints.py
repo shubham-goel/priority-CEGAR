@@ -167,6 +167,143 @@ def k_maxSimulationConstraints(stng, s, t, exact=False,
 	else:
 		s.add(Sum(sum_expr) <= k_delays)
 
+def k_maxSimulationConstraints_BOOL(stng, s, t, exact=False,
+	k_omissions=0,k_crashes=0,k_delays=0):
+	'''
+	Add BOOLEAN constraints specific to k only.
+	'''
+	bit_vector_omissions,bit_vector_crashes,bit_vector_delays = def_bit_vectors(stng,
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+
+	# Take care of number of omissions
+	if k_omissions>0:
+		equate_bit_vectors_in_list_adding(stng, s, t, bit_vector_omissions)
+		# COMPARE WITH k_omissions
+		comare_bits_with_number(s,bit_vector_omissions[stng.g.E[-1]],k_omissions,exact=exact)
+	else:
+		constr = []
+		for e in stng.g.E:
+			constr.append(And([Not(stng.vars.omit(e,i)) for i in range(t)]))
+		s.add(And(constr))
+
+	# Take care of number of crashes
+	if k_crashes>0:
+		equate_bit_vectors_in_list_adding(stng, s, t, bit_vector_crashes)
+		# COMPARE WITH k_crashes
+		comare_bits_with_number(s,bit_vector_crashes[stng.g.E[-1]],k_crashes,exact=exact)
+	else:
+		constr = []
+		for e in stng.g.E:
+			constr.append(And([Not(stng.vars.crash(e,i)) for i in range(t)]))
+		s.add(And(constr))
+
+	# Take care of number of delays
+	if k_delays>0:
+		equate_bit_vectors_in_list_adding(stng, s, t, bit_vector_delays)
+		# COMPARE WITH k_delays
+		comare_bits_with_number(s,bit_vector_delays[stng.g.E[-1]],k_delays,exact=exact)
+	else:
+		constr = []
+		for e in stng.g.E:
+			constr.append(And([Not(stng.vars.delay(e,i)) for i in range(t)]))
+		s.add(And(constr))
+
+def comare_bits_with_number(s,bit_vector,k,exact=True):
+	k_bin = str(bin(k)[2:])
+	k_bin = ''.join(['0' for i in range(len(bit_vector)-len(k_bin))])+k_bin
+	k_bin = [k_bin[i]=='1' for i in range(len(k_bin))]
+	k_bin = k_bin[::-1]
+	assert len(bit_vector)==len(k_bin)
+
+	constr = []
+	if exact:
+		for i in range(len(bit_vector)):
+			constr.append(bit_vector[i]==k_bin[i])
+		final = And(constr)
+	else:
+		eq = True
+		for i in range(len(bit_vector)):
+			constr.append(And(eq,k_bin[i],Not(bit_vector[i])))
+			eq = And(eq,bit_vector[i]==k_bin[i])
+		constr.appen(eq)
+		final = Or(constr)
+
+	s.add(final)
+
+def equate_bit_vectors_in_list_adding(stng, s, t, bit_vectors):
+	assert len(stng.g.E) == len(bit_vectors)-1
+
+	constr = []
+
+	rhs1= equate_bit_vectors_constr(s,bit_vectors[0],bit_vectors[stng.g.E[0]],add1=True)
+	rhs2= equate_bit_vectors_constr(s,bit_vectors[0],bit_vectors[stng.g.E[0]],add1=False)
+	constr.append(If(stng.vars.crash(stng.g.E[0],t-1),rhs1,rhs2))
+
+	for i in range(len(stng.g.E)-1):
+		rhs1= equate_bit_vectors_constr(s,bit_vectors[stng.g.E[i]],bit_vectors[stng.g.E[i+1]],add1=True)
+		rhs2= equate_bit_vectors_constr(s,bit_vectors[stng.g.E[i]],bit_vectors[stng.g.E[i+1]],add1=False)
+		constr.append(If(stng.vars.crash(stng.g.E[i+1],t-1),rhs1,rhs2))
+
+	s.add(And(constr))
+
+def equate_bit_vectors_constr(s, vec1, vec2, add1=False):
+	assert len(vec1) == len(vec2)
+
+	constr = []
+
+	if add1:
+		carry = True
+		for i in range(len(vec1)):
+			constr.append(vec2[i] == Xor(vec1[i], carry))
+			carry = And(vec1[i], carry)
+		# Prevent overflowing
+		constr.append(Not(carry))
+	else:
+		for i in range(len(vec1)):
+			constr.append(vec2[i] == vec1[i])
+
+	return And(constr)
+
+
+def def_bit_vectors(stng, k_omissions=0, k_crashes=0, k_delays=0):
+
+	bit_vector_omissions = {}
+	bit_vector_crashes = {}
+	bit_vector_delays = {}
+
+	bit_vector_omissions[0] = [False for i in range(int(math.log(k_omissions+1,2))+1)]
+	bit_vector_crashes[0] = [False for i in range(int(math.log(k_crashes+1,2))+1)]
+	bit_vector_delays[0] = [False for i in range(int(math.log(k_delays+1,2))+1)]
+
+	for e in stng.g.E:
+
+		if k_omissions>0:
+			bit_vector_omissions[e]= []
+			for i  in range(int(math.log(k_omissions+1,2))+1):
+				bit_vector_omissions[e].append(Bool('omissions bit vector bit{} e{} '.format(i,e)))
+
+		if k_crashes>0:
+			bit_vector_crashes[e]= []
+			for i  in range(int(math.log(k_crashes+1,2))+1):
+				bit_vector_crashes[e].append(Bool('crashes bit vector bit{} e{} '.format(i,e)))
+
+		if k_delays>0:
+			bit_vector_delays[e]= []
+			for i  in range(int(math.log(k_delays+1,2))+1):
+				bit_vector_delays[e].append(Bool('delays bit vector bit{} e{} '.format(i,e)))
+
+	if k_omissions<=0:
+		bit_vector_omissions=None
+
+	if k_crashes<=0:
+		bit_vector_crashes=None
+
+	if k_delays<=0:
+		bit_vector_delays=None
+
+	return bit_vector_omissions,bit_vector_crashes,bit_vector_delays
+
+
 def addPriorityConstraints(stng, M, s=None):
 	'''
 	Adds priority-uniqueness contraints to solvers:

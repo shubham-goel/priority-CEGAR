@@ -121,12 +121,16 @@ def count_WFS(stng, pr, M, t, l,
 
 	return counter
 
-def successProb(stng, pr, M, t, l,optimize=False,
+def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
 	Returns the probability of pr failing, given the crash parameters
 	'''
-	s = Solver()
+	print p_omissions,p_crashes,p_delays
+	if naive:
+		s = Solver()
+	else:
+		s = myGoal()
 
 	defineSimulationVariables(stng, M, t)
 	generalSimulationConstraints(stng,s, M, t, l)
@@ -148,27 +152,109 @@ def successProb(stng, pr, M, t, l,optimize=False,
 		print "Time taken = {}".format(count_time)
 		if AskContinue(lower_bound,upper_bound,k_crashes) is False:
 			break
+		if k_crashes>len(stng.g.E): break
 
 		# create backtracking point for successive values of k
 		s.push()
 
 		start_time = time.time()
 
-		k_maxSimulationConstraints(stng,s, t, exact=True,
-			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+		if naive:
+			k_maxSimulationConstraints(stng,s, t, exact=True,
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
-		p1 = saboteurProbability(stng,s,pr,M,t,l,optimize=optimize,
-			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
-			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		p2 = crashesProbability(stng,M,t,
-			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
-			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+			p1 = saboteurProbability(stng,s,pr,M,t,l,optimize=optimize,
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+			p2 = crashesProbability(stng,M,t,
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+
+			# Update Bounds
+			lower_bound += p2 - p1
+			upper_bound -= p1
+
+		else:
+			# COMPUTES ONLY BOUNDS ON PRIORITY
+			k_maxSimulationConstraints_BOOL(stng,s, t, exact=True,
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+
+			# Process and save Formula to file
+			glbl_vars.init()
+			cnf_file = "umc_dimacs.txt"
+			sol_file = "num_sols.txt"
+			# tact = Tactic('tseitin-cnf')
+			tact = With('tseitin-cnf',distributivity=False)
+			print_time("cnf to dimacs...")
+			cnf = tact(s.get_goal())[0]
+			print "Number of clauses = ",len(cnf)
+			dimacs = cnf_to_DIMACS(cnf)
+			print_time("saving dimacs to file...")
+			save_DIMACS_to_file(dimacs,cnf_file)
+
+			print "k_crashes=",k_crashes
+
+			# approxMC, cryptominsat take too long to run
+			# # Run approxMC on file
+			# print_time("##################running approxMC on file...")
+			# # cmd = 'py MIS.py -output=mis.out {}'.format(cnf_file)
+			# # run_bash(cmd)
+			# # with open("mis.out", "r") as f_temp:
+			# # 	c_ind = f_temp.read()
+			# # 	c_ind = "c ind {}".format(c_ind[2:])
+			# # with open("mis.out", "w") as f_temp:
+			# # 	f.write(c_ind)
+			# # cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
+			# # run_bash(cmd)
+			# cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
+			# run_bash(cmd)
+
+			# Run sharpSAT on file
+			print_time("#################running sharpSAT on file...")
+			cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
+			run_bash(cmd)
+
+			# Process sharpSat output to get #Sols
+			print_time("################reading sharpSat's output...")
+			numSols = process_sharpSat_output(sol_file)
+			print "num_sols={}".format(numSols)
+
+			lb=numSols*((1-p_crashes)**(t*(len(stng.g.E))-k_crashes))*(p_crashes**k_crashes)
+			ub=numSols*((1-p_crashes)**(t*(len(stng.g.E)-k_crashes)))*(p_crashes**k_crashes)
+			print "lb={}, ub={}".format(lb,ub)
+
+			p2 = crashesProbability(stng,M,t,
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+			print "p2={}".format(p2)
+
+			# Update Bounds
+			lower_bound += p2 - ub
+			upper_bound -= lb
+
+			if lower_bound<0:
+				lower_bound = 0
+
+			# USE FOR DEBUGGING
+			# counter = 0
+			# s_solver = s.get_solver()
+
+			# print "USING NAIVE APPROACH NOW"
+			# while True:
+			# 	if s_solver.check() == sat:
+			# 		crash_model = s_solver.model()
+			# 		print "FOUND {}".format(counter)
+			# 		# printCounterexample(stng, crash_model, t, M)
+			# 		# printConfigurations(stng, crash_model, t, M)
+			# 		counter += 1
+			# 		excludeCrashModel(stng,s_solver,crash_model,t,
+			# 			omissions=(k_omissions>0),crashes=(k_crashes>0),delays=(k_delays>0))
+			# 	else:
+			# 		break
+
+			# assert counter==numSols
 
 		end_time = time.time()
-
-		# Update Bounds
-		lower_bound += p2 - p1
-		upper_bound -= p1
 
 		s.pop()
 

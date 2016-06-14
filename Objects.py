@@ -249,3 +249,46 @@ class weight_var:
 		if not other:
 			return False
 		return self.id == other.id
+
+class myGoal:
+	def __init__(self):
+		self.constr_list = []
+		self.backtracking = Stack()
+	def __str__(self):
+		return str(self.constr_list)
+	def add(self,expr):
+		self.constr_list.append(expr)
+	def push(self):
+		self.backtracking.push(len(self.constr_list))
+	def pop(self):
+		self.constr_list = self.constr_list[:self.backtracking.pop()]
+	def get_goal(self):
+		s = Goal()
+		s.add(And(self.constr_list))
+		return s
+	def get_solver(self):
+		s = Solver()
+		s.add(And(self.constr_list))
+		return s
+	def print_constr(self):
+		for i in self.constr_list:
+			print i
+
+class Stack:
+	def __init__(self):
+		self.items = []
+
+	def isEmpty(self):
+		return self.items == []
+
+	def push(self, item):
+		self.items.append(item)
+
+	def pop(self):
+		return self.items.pop()
+
+	def peek(self):
+		return self.items[len(self.items)-1]
+
+	def size(self):
+		return len(self.items)

@@ -555,6 +555,25 @@ def trim_sides(literal):
 # WMC
 ########
 
+def process_approxMC_output(sol_file):
+	numSols = None
+	with open(sol_file, "r") as f:
+		status = 0
+		for line in f:
+			if line=="The input formula is unsatisfiable.\n":
+				numSols=0
+				break
+			elif line[:24]=="Number of solutions is: ":
+				print line[24:-1]
+				expr = line[24:-1].split('x')
+				num1 = int(expr[0])
+				num2 = int(expr[1].split('^')[0])
+				num3 = int(expr[1].split('^')[1])
+				numSols = num1*(num2**num3)
+
+		assert numSols is not None
+	return numSols
+
 def process_sharpSat_output(sol_file):
 	numSols = None
 	with open(sol_file, "r") as f:
@@ -655,3 +674,8 @@ def wieghted_to_unweighted(stng,s,weight_vars,t,
 		denom *= 2**expo
 
 	return denom
+
+def run_bash(cmd):
+	if subprocess.call([cmd],shell=True) == 1 :
+		print("Exit Status error!")
+		raise
