@@ -155,9 +155,10 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	while True:
 		count_time = end_time-start_time
 		print "Time taken = {}".format(count_time)
-		if AskContinue(lower_bound,upper_bound,k_crashes) is False:
-			break
+		# if AskContinue(lower_bound,upper_bound,k_crashes) is False:
+		# 	break
 		if k_crashes>len(stng.g.E): break
+		print '----------------------k_crashes =',k_crashes,'-----------------------'
 
 		# create backtracking point for successive values of k
 		s.push()
