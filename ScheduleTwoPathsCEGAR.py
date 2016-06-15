@@ -181,7 +181,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 			# Process and save Formula to file
 			glbl_vars.init()
-			cnf_file = "umc_dimacs.txt"
+			cnf_file = "umc_dimacs{}.txt".format(k_crashes)
 			sol_file = "num_sols.txt"
 			# tact = Tactic('tseitin-cnf')
 			tact = With('tseitin-cnf',distributivity=False)
@@ -196,16 +196,17 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 			# approxMC, cryptominsat take too long to run
 			# # Run approxMC on file
-			# print_time("##################running approxMC on file...")
-			# # cmd = 'py MIS.py -output=mis.out {}'.format(cnf_file)
+			# # print_time("##################running MIS on file...")
+			# # cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
 			# # run_bash(cmd)
 			# # with open("mis.out", "r") as f_temp:
 			# # 	c_ind = f_temp.read()
 			# # 	c_ind = "c ind {}".format(c_ind[2:])
 			# # with open("mis.out", "w") as f_temp:
-			# # 	f.write(c_ind)
+			# # 	f_temp.write(c_ind)
 			# # cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
 			# # run_bash(cmd)
+			# print_time("##################running approxMC on file...")
 			# cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
 			# run_bash(cmd)
 
