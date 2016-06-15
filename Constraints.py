@@ -208,161 +208,46 @@ def k_maxSimulationConstraints_BOOL(stng, s, t, exact=False,
 			constr.append(And([Not(stng.vars.delay(e,i)) for i in range(t)]))
 		s.add(And(constr))
 
-def comare_bits_with_number(s,bit_vector,k,exact=True):
-	k_bin = str(bin(k)[2:])
-	k_bin = ''.join(['0' for i in range(len(bit_vector)-len(k_bin))])+k_bin
-	k_bin = [k_bin[i]=='1' for i in range(len(k_bin))]
-	k_bin = k_bin[::-1]
-	assert len(bit_vector)==len(k_bin)
-
-	constr = []
-	if exact:
-		for i in range(len(bit_vector)):
-			constr.append(bit_vector[i]==k_bin[i])
-		final = And(constr)
-	else:
-		eq = True
-		for i in range(len(bit_vector)):
-			constr.append(And(eq,k_bin[i],Not(bit_vector[i])))
-			eq = And(eq,bit_vector[i]==k_bin[i])
-		constr.appen(eq)
-		final = Or(constr)
-
-	s.add(final)
-
-def equate_bit_vectors_in_list_adding(stng, s, t, bit_vectors):
-	assert len(stng.g.E) == len(bit_vectors)-1
-
-	constr = []
-
-	rhs1= equate_bit_vectors_constr(s,bit_vectors[0],bit_vectors[stng.g.E[0]],add1=True)
-	rhs2= equate_bit_vectors_constr(s,bit_vectors[0],bit_vectors[stng.g.E[0]],add1=False)
-	constr.append(If(stng.vars.crash(stng.g.E[0],t-1),rhs1,rhs2))
-
-	for i in range(len(stng.g.E)-1):
-		rhs1= equate_bit_vectors_constr(s,bit_vectors[stng.g.E[i]],bit_vectors[stng.g.E[i+1]],add1=True)
-		rhs2= equate_bit_vectors_constr(s,bit_vectors[stng.g.E[i]],bit_vectors[stng.g.E[i+1]],add1=False)
-		constr.append(If(stng.vars.crash(stng.g.E[i+1],t-1),rhs1,rhs2))
-
-	s.add(And(constr))
-
-def equate_bit_vectors_constr(s, vec1, vec2, add1=False):
-	assert len(vec1) == len(vec2)
-
-	constr = []
-
-	if add1:
-		carry = True
-		for i in range(len(vec1)):
-			constr.append(vec2[i] == Xor(vec1[i], carry))
-			carry = And(vec1[i], carry)
-		# Prevent overflowing
-		constr.append(Not(carry))
-	else:
-		for i in range(len(vec1)):
-			constr.append(vec2[i] == vec1[i])
-
-	return And(constr)
-
-
-def def_bit_vectors(stng, k_omissions=0, k_crashes=0, k_delays=0):
-
-	bit_vector_omissions = {}
-	bit_vector_crashes = {}
-	bit_vector_delays = {}
-
-	bit_vector_omissions[0] = [False for i in range(int(math.log(k_omissions+1,2))+1)]
-	bit_vector_crashes[0] = [False for i in range(int(math.log(k_crashes+1,2))+1)]
-	bit_vector_delays[0] = [False for i in range(int(math.log(k_delays+1,2))+1)]
-
-	for e in stng.g.E:
-
-		if k_omissions>0:
-			bit_vector_omissions[e]= []
-			for i  in range(int(math.log(k_omissions+1,2))+1):
-				bit_vector_omissions[e].append(Bool('omissions bit vector bit{} e{} '.format(i,e)))
-
-		if k_crashes>0:
-			bit_vector_crashes[e]= []
-			for i  in range(int(math.log(k_crashes+1,2))+1):
-				bit_vector_crashes[e].append(Bool('crashes bit vector bit{} e{} '.format(i,e)))
-
-		if k_delays>0:
-			bit_vector_delays[e]= []
-			for i  in range(int(math.log(k_delays+1,2))+1):
-				bit_vector_delays[e].append(Bool('delays bit vector bit{} e{} '.format(i,e)))
-
-	if k_omissions<=0:
-		bit_vector_omissions=None
-
-	if k_crashes<=0:
-		bit_vector_crashes=None
-
-	if k_delays<=0:
-		bit_vector_delays=None
-
-	return bit_vector_omissions,bit_vector_crashes,bit_vector_delays
-
-
 def addPriorityConstraints(stng, M, s=None):
 	'''
 	Adds priority-uniqueness contraints to solvers:
 	No 2 messages have the same priority
-	Every message has exactly one priority
 	'''
 	if s is None:
 		s=Solver()
 		definePriorityVariables(stng, M)
 
+	# Global Priorities
+	constr = []
+	for m in M:
+		for v in stng.UFSv[m]:
+			constr.append(stng.vars.priority(m,v) == stng.vars.priority(m,list(stng.UFSv[m])[0]))
+	s.add(And(constr))
+
 	for m in M:
 		for v in stng.UFSv[m]:
 
 			# No 2 messages have the same priority
-			unique_message = []
-			# Every message has at most one priority
-			unique_priority = []
+			unique_message = [stng.vars.priority(m2,v) != stng.vars.priority(m,v)
+							for m2 in M if  m2 != m and v in stng.UFSv[m2]]
 
-			for i in range(len(M)):
-
-				unique_message = [stng.vars.priority(m2,v,i)
-								for m2 in M if  m2 != m and v in stng.UFSv[m2]]
-				unique_priority = [stng.vars.priority(m,v,j)
-								for j in range(len(M)) if  j != i]
-
-				disconjunct = Or(Or(unique_message),Or(unique_priority))
-
-				s.add(Implies(stng.vars.priority(m,v,i),Not(disconjunct)))
-
-			# Every message has at least one priority
-			priority_existence = [stng.vars.priority(m,v,j)
-									for j in range(len(M))]
-			s.add(Or(priority_existence))
+			s.add(And(unique_message))
 
 	return s
 
-def prioritySimulationConstraints(stng, s, M, t, pr, l):
+def prioritySimulationConstraints(stng, s, M, t, l):
 
 	# messages start at their origin
 	for m in M:
-		s.add(getUniqueConfigConstr(stng, m, m.s, 0))
+		s.add(stng.vars.config(m,m.s,0)==1)
 
+	# # if a message reaches its destination, it stays there.
+	# for m in M:
+	# 	for i in range(t):
+	# 		s.add(Implies(stng.vars.config(m, m.t, i), getUniqueConfigConstr(stng, m, m.t, i+1)))
 
-	# if a message reaches its destination, it stays there.
-	for m in M:
-		for i in range(t):
-			s.add(Implies(stng.vars.config(m, m.t, i), getUniqueConfigConstr(stng, m, m.t, i+1)))
-
-	# All messages arrive on time if no crashes occur
-	s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) >= l)
-
-	# Setting priority Int() vars to have value equal to  priority
-	constraints_pr = []
-	for m in M:
-		for v in stng.UFSv[m]:
-			for j in range(len(M)):
-				constr = (stng.vars.priority(m,v,j) == (pr[m][v]==j))
-				constraints_pr.append(constr)
-	s.add(And(constraints_pr))
+	# # All messages arrive on time if no crashes occur
+	# s.add(Sum([If(stng.vars.config(m, m.t, t), 1, 0) for m in M]) >= l)
 
 	# If m uses e at t, it must be on e.s and e.t at time t and t+1 respectively
 	constraints_pos = []
@@ -404,6 +289,48 @@ def prioritySimulationConstraints(stng, s, M, t, pr, l):
 					constr = Implies(stng.vars.config(m,v,i),Or(ors))
 					constraints_used.append(constr)
 	s.add(And(constraints_used))
+
+def boundednessConstraints(stng,s,M,t):
+	bounds = []
+	for m in M:
+		for v in stng.g.V:
+			# message m's priority at vertex v
+			bounds.append(And(stng.vars.priority(m,v)<=len(M),
+								stng.vars.priority(m,v)>=1))
+
+	for m in M:
+		for v in stng.UFSv[m]:
+			# is message m at vertex v at time i
+			for i in range(t+1):
+				bounds.append(And(stng.vars.config(m,v,i)<=1,
+								stng.vars.config(m,v,i)>=0))
+
+			for e in stng.edge_priority[m][v]:
+				for i in range(t):
+					# is message m using e at i
+					bounds.append(And(stng.vars.used(m,e,i)<=1,
+										stng.vars.used(m,e,i)>=0))
+
+		# has message arrived destination
+		bounds.append(And(stng.vars.msgArrive(m)<=1,
+							stng.vars.msgArrive(m)>=0))
+
+	for e in stng.g.E:
+		for i in range(t):
+
+			# Is there an omission fault at e at time i
+			bounds.append(And(stng.vars.omit(e,i)<=1,
+								stng.vars.omit(e,i)>=0))
+
+			# Is there a crash fault at e at time i
+			bounds.append(And(stng.vars.crash(e,i)<=1,
+								stng.vars.crash(e,i)>=0))
+
+			# Is there a delay fault at e at time i
+			bounds.append(And(stng.vars.delay(e,i)<=1,
+								stng.vars.delay(e,i)>=0))
+
+	s.add(And(bounds))
 
 #######
 # MINOR

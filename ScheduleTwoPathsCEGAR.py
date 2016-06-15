@@ -417,16 +417,16 @@ def CEGAR(stng, M, t, l,
 
 	# Add priority uniqueness constraints
 	print_time("defining priority vars...")
-	pr = definePriorityVariables(stng, M, heuristic=True)
+	definePriorityVariables(stng, M)
 	print_time("defining simulation vars...")
 	defineSimulationVariables(stng, M, t)
 	print_time("adding priority constraints...")
 	addPriorityConstraints(stng, M, s=s) #BOTTLENECK1
 
-	# Add HERE more heuristics/constraints
-	# for getting good initial message priorities
-	print_time("implementing heuristic...")
-	prioritySimulationConstraints(stng, s, M, t, pr, l)
+	# # Add HERE more heuristics/constraints
+	# # for getting good initial message priorities
+	# print_time("implementing heuristic...")
+	# prioritySimulationConstraints(stng, s, M, t, l)
 
 	print_time("solving z3 program...")
 	mdl = getModel(s)
@@ -473,10 +473,10 @@ def CEGAR(stng, M, t, l,
 		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
 
-		# prob = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
-		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		prob = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
 		end_time = time.time()
 		count_time = end_time-start_time
@@ -526,27 +526,6 @@ def CEGAR(stng, M, t, l,
 		if mdl is False:
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
-
-def getEdgePriorities(g, FCv, UFSv, M):
-	'''
-	Return Edge Priority data from First and Second Path
-	Return first and second priority edges as:
-	edge_priority[m][v][0] and edge_priority[m][v][1]
-	'''
-	edge_priority = {}
-	for m in M:
-		edge_priority[m]= {}
-		for v in g.V:
-			edge_priority[m][v] = []
-		for v in FCv[m]:
-			edge = g(v,v.nextF(m))
-			if edge is not None:
-				edge_priority[m][v].append(edge)
-		for v in UFSv[m]:
-			edge = g(v,v.nextS(m))
-			if edge is not None:
-				edge_priority[m][v].append(edge)
-	return edge_priority
 
 def main(n, m, e, t, l,
 	k_omissions=0, k_crashes=0, k_delays=0,

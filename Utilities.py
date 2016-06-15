@@ -232,9 +232,7 @@ def GeneratePriorities(stng, mdl, M):
 
 	for m in M:
 		for v in stng.UFSv[m]:
-			for i in range(len(M)):
-				if is_true(mdl[stng.vars.priority(m,v,i)]):
-					priorities[v].append((i,m))
+			priorities[v].append((mdl[stng.vars.priority(m,v)],m))
 
 	for v in stng.g.V:
 		priorities[v] = sorted(priorities[v], key=lambda student: student[0])
@@ -281,6 +279,70 @@ def reduce_precision(p,precision):
 	print "returning",number
 	return number
 
+def run_bash(cmd):
+	if subprocess.call([cmd],shell=True) == 1 :
+		print("Exit Status error!")
+		raise
+
+def getEdgePriorities(g, FCv, UFSv, M):
+	'''
+	Return Edge Priority data from First and Second Path
+	Return first and second priority edges as:
+	edge_priority[m][v][0] and edge_priority[m][v][1]
+	'''
+	edge_priority = {}
+	for m in M:
+		edge_priority[m]= {}
+		for v in g.V:
+			edge_priority[m][v] = []
+		for v in FCv[m]:
+			edge = g(v,v.nextF(m))
+			if edge is not None:
+				edge_priority[m][v].append(edge)
+		for v in UFSv[m]:
+			edge = g(v,v.nextS(m))
+			if edge is not None:
+				edge_priority[m][v].append(edge)
+	return edge_priority
+
+def process_approxMC_output(sol_file):
+	numSols = None
+	with open(sol_file, "r") as f:
+		status = 0
+		for line in f:
+			if line=="The input formula is unsatisfiable.\n":
+				numSols=0
+				break
+			elif line[:24]=="Number of solutions is: ":
+				print line[24:-1]
+				expr = line[24:-1].split('x')
+				num1 = int(expr[0])
+				num2 = int(expr[1].split('^')[0])
+				num3 = int(expr[1].split('^')[1])
+				numSols = num1*(num2**num3)
+
+		assert numSols is not None
+	return numSols
+
+def process_sharpSat_output(sol_file):
+	numSols = None
+	with open(sol_file, "r") as f:
+		status = 0
+		for line in f:
+			if status == 0:
+				if line=="# solutions \n":
+					status += 1
+			elif status == 1:
+				numSols = int(line)
+				status += 1
+			elif status == 2:
+				assert line=="# END\n"
+				status += 1
+			else:
+				break
+		assert (status==3)
+		assert numSols is not None
+	return numSols
 
 ##########
 # PRINTING
@@ -405,23 +467,14 @@ def print_time(msg):
 # DEFINE VARS
 #############
 
-def definePriorityVariables(stng, M, heuristic=None, basic_names=False):
+def definePriorityVariables(stng, M, basic_names=False):
 	'''
 	Initaializes/defines message priority variables
 	'''
 	for m in M:
-		for v in stng.UFSv[m]:
-			# message m has priority j at vertex v
-			for j in range(len(M)):
-				stng.vars.def_priority(m,v,j,basic_names=basic_names)
-
-	if heuristic is not None:
-		pr = {}
-		for m in M:
-			pr[m] = {}
-			for v in stng.UFSv[m]:
-				pr[m][v] = Int('priority of {} at vertex {}'.format(str(m),str(v)))
-		return pr
+		for v in stng.g.V:
+			# message m's priority at vertex v
+			stng.vars.def_priority(m,v,basic_names=basic_names)
 
 def defineSimulationVariables(stng, M, t, basic_names=False):
 	'''
@@ -555,45 +608,6 @@ def trim_sides(literal):
 # WMC
 ########
 
-def process_approxMC_output(sol_file):
-	numSols = None
-	with open(sol_file, "r") as f:
-		status = 0
-		for line in f:
-			if line=="The input formula is unsatisfiable.\n":
-				numSols=0
-				break
-			elif line[:24]=="Number of solutions is: ":
-				print line[24:-1]
-				expr = line[24:-1].split('x')
-				num1 = int(expr[0])
-				num2 = int(expr[1].split('^')[0])
-				num3 = int(expr[1].split('^')[1])
-				numSols = num1*(num2**num3)
-
-		assert numSols is not None
-	return numSols
-
-def process_sharpSat_output(sol_file):
-	numSols = None
-	with open(sol_file, "r") as f:
-		status = 0
-		for line in f:
-			if status == 0:
-				if line=="# solutions \n":
-					status += 1
-			elif status == 1:
-				numSols = int(line)
-				status += 1
-			elif status == 2:
-				assert line=="# END\n"
-				status += 1
-			else:
-				break
-		assert (status==3)
-		assert numSols is not None
-	return numSols
-
 def set_weight_vars(stng, s, M, t,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	print p_omissions,p_crashes,p_delays
@@ -675,7 +689,100 @@ def wieghted_to_unweighted(stng,s,weight_vars,t,
 
 	return denom
 
-def run_bash(cmd):
-	if subprocess.call([cmd],shell=True) == 1 :
-		print("Exit Status error!")
-		raise
+###########
+# BIT ADDER
+###########
+
+def def_bit_vectors(stng, k_omissions=0, k_crashes=0, k_delays=0):
+
+	bit_vector_omissions = {}
+	bit_vector_crashes = {}
+	bit_vector_delays = {}
+
+	bit_vector_omissions[0] = [False for i in range(int(math.log(k_omissions+1,2))+1)]
+	bit_vector_crashes[0] = [False for i in range(int(math.log(k_crashes+1,2))+1)]
+	bit_vector_delays[0] = [False for i in range(int(math.log(k_delays+1,2))+1)]
+
+	for e in stng.g.E:
+
+		if k_omissions>0:
+			bit_vector_omissions[e]= []
+			for i  in range(int(math.log(k_omissions+1,2))+1):
+				bit_vector_omissions[e].append(Bool('omissions bit vector bit{} e{} '.format(i,e)))
+
+		if k_crashes>0:
+			bit_vector_crashes[e]= []
+			for i  in range(int(math.log(k_crashes+1,2))+1):
+				bit_vector_crashes[e].append(Bool('crashes bit vector bit{} e{} '.format(i,e)))
+
+		if k_delays>0:
+			bit_vector_delays[e]= []
+			for i  in range(int(math.log(k_delays+1,2))+1):
+				bit_vector_delays[e].append(Bool('delays bit vector bit{} e{} '.format(i,e)))
+
+	if k_omissions<=0:
+		bit_vector_omissions=None
+
+	if k_crashes<=0:
+		bit_vector_crashes=None
+
+	if k_delays<=0:
+		bit_vector_delays=None
+
+	return bit_vector_omissions,bit_vector_crashes,bit_vector_delays
+
+def comare_bits_with_number(s,bit_vector,k,exact=True):
+	k_bin = str(bin(k)[2:])
+	k_bin = ''.join(['0' for i in range(len(bit_vector)-len(k_bin))])+k_bin
+	k_bin = [k_bin[i]=='1' for i in range(len(k_bin))]
+	k_bin = k_bin[::-1]
+	assert len(bit_vector)==len(k_bin)
+
+	constr = []
+	if exact:
+		for i in range(len(bit_vector)):
+			constr.append(bit_vector[i]==k_bin[i])
+		final = And(constr)
+	else:
+		eq = True
+		for i in range(len(bit_vector)):
+			constr.append(And(eq,k_bin[i],Not(bit_vector[i])))
+			eq = And(eq,bit_vector[i]==k_bin[i])
+		constr.appen(eq)
+		final = Or(constr)
+
+	s.add(final)
+
+def equate_bit_vectors_in_list_adding(stng, s, t, bit_vectors):
+	assert len(stng.g.E) == len(bit_vectors)-1
+
+	constr = []
+
+	rhs1= equate_bit_vectors_constr(s,bit_vectors[0],bit_vectors[stng.g.E[0]],add1=True)
+	rhs2= equate_bit_vectors_constr(s,bit_vectors[0],bit_vectors[stng.g.E[0]],add1=False)
+	constr.append(If(stng.vars.crash(stng.g.E[0],t-1),rhs1,rhs2))
+
+	for i in range(len(stng.g.E)-1):
+		rhs1= equate_bit_vectors_constr(s,bit_vectors[stng.g.E[i]],bit_vectors[stng.g.E[i+1]],add1=True)
+		rhs2= equate_bit_vectors_constr(s,bit_vectors[stng.g.E[i]],bit_vectors[stng.g.E[i+1]],add1=False)
+		constr.append(If(stng.vars.crash(stng.g.E[i+1],t-1),rhs1,rhs2))
+
+	s.add(And(constr))
+
+def equate_bit_vectors_constr(s, vec1, vec2, add1=False):
+	assert len(vec1) == len(vec2)
+
+	constr = []
+
+	if add1:
+		carry = True
+		for i in range(len(vec1)):
+			constr.append(vec2[i] == Xor(vec1[i], carry))
+			carry = And(vec1[i], carry)
+		# Prevent overflowing
+		constr.append(Not(carry))
+	else:
+		for i in range(len(vec1)):
+			constr.append(vec2[i] == vec1[i])
+
+	return And(constr)

@@ -6,7 +6,6 @@ class Vars:
 	def __init__(self):
 		self.vars = {}
 
-
 	def def_sched(self, m, e, i, basic_names=False):
 
 		if basic_names:
@@ -19,17 +18,26 @@ class Vars:
 	def sched(self, m, e, i):
 		return self.vars[(m,e,i)]
 
-	def def_priority(self, m, v, j, basic_names=False):
+	def def_priority(self, m, v, j=None, basic_names=False):
 
 		if basic_names:
 			var_name = str(glbl_vars.variable_number)
 			glbl_vars.variable_number += 1
+		elif j is None:
+			var_name = ('m%s\'s priority at v%s'%(str(m), str(v)))
 		else:
 			var_name = ('m%s at v%s has priority %d'%(str(m), str(v), j))
-		self.vars[(m,v,j,'priority')] = Bool(var_name)
 
-	def priority(self, m, v, j):
-		return self.vars[(m,v,j,'priority')]
+		if j is None:
+			self.vars[(m,v,'priority')] = Int(var_name)
+		else:
+			self.vars[(m,v,j,'priority')] = Bool(var_name)
+
+	def priority(self, m, v, j=None):
+		if j is None:
+			return self.vars[(m,v,'priority')]
+		else:
+			return self.vars[(m,v,j,'priority')]
 
 	def def_config(self, m, v, i, basic_names=False):
 
@@ -38,7 +46,7 @@ class Vars:
 			glbl_vars.variable_number += 1
 		else:
 			var_name = ('m%s is on v%s at time %d'%(str(m), str(v), i))
-		self.vars[(m,v,i,'config')] = Bool(var_name)
+		self.vars[(m,v,i,'config')] = Real(var_name)
 
 	def config(self, m, v, i):
 		return self.vars[(m,v,i,'config')]
@@ -50,7 +58,7 @@ class Vars:
 			glbl_vars.variable_number += 1
 		else:
 			var_name = ('e%s crashes at time %d'%(str(e), i))
-		self.vars[(e,i,'crash')] = Bool(var_name)
+		self.vars[(e,i,'crash')] = Real(var_name)
 
 	def crash(self, e, i):
 		'''
@@ -59,7 +67,7 @@ class Vars:
 		try:
 			return self.vars[(e,i,'crash')]
 		except KeyError:
-			return False
+			return 0
 
 	def def_delay(self, e, i, basic_names=False):
 
@@ -68,7 +76,7 @@ class Vars:
 			glbl_vars.variable_number += 1
 		else:
 			var_name = ('e%s delays at time %d'%(str(e), i))
-		self.vars[(e,i,'delay')] = Bool(var_name)
+		self.vars[(e,i,'delay')] = Real(var_name)
 
 	def delay(self, e, i):
 		'''
@@ -77,7 +85,7 @@ class Vars:
 		try:
 			return self.vars[(e,i,'delay')]
 		except KeyError:
-			return False
+			return 0
 
 	def def_omit(self, e, i, basic_names=False):
 
@@ -86,7 +94,7 @@ class Vars:
 			glbl_vars.variable_number += 1
 		else:
 			var_name = ('e%s omits at time %d'%(str(e), i))
-		self.vars[(e,i,'omit')] = Bool(var_name)
+		self.vars[(e,i,'omit')] = Real(var_name)
 
 	def omit(self, e, i):
 		'''
@@ -95,7 +103,7 @@ class Vars:
 		try:
 			return self.vars[(e,i,'omit')]
 		except KeyError:
-			return False
+			return 0
 
 	def def_used(self, m, e, i, basic_names=False):
 
@@ -104,7 +112,7 @@ class Vars:
 			glbl_vars.variable_number += 1
 		else:
 			var_name = ('m%s is using e%s at time %d'%(str(m), str(e), i))
-		self.vars[(m,e,i,'used')] = Bool(var_name)
+		self.vars[(m,e,i,'used')] = Real(var_name)
 
 	def used(self, m, e, i):
 		return self.vars[(m,e,i,'used')]
@@ -116,7 +124,7 @@ class Vars:
 		try:
 			return self.vars[(m,e,i,'used')]
 		except KeyError:
-			return False
+			return 0
 
 	def def_msgArrive(self, m, basic_names=False):
 
@@ -125,7 +133,7 @@ class Vars:
 			glbl_vars.variable_number += 1
 		else:
 			var_name = ('m%s has arrived'%str(m))
-		self.vars[m] = Bool(var_name)
+		self.vars[m] = Real(var_name)
 
 	def msg(self, m):
 		return self.vars[m]
@@ -165,7 +173,6 @@ class Vertex:
 			return False
 		return self.name == other.name
 
-
 class Edge:
 	def __init__(self, s, t):
 		self.s = s
@@ -189,7 +196,6 @@ class Graph:
 		for e in self.E:
 			if e.s == v and e.t == u:
 				return e
-
 
 class Message:
 	def __init__(self, s, t, name):
