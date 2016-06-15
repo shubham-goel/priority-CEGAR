@@ -94,6 +94,12 @@ def crashesProbability(stng,M,t,crashed=0,
 # MISC
 ######
 
+def save_counting_parameters(n,m,e,t,k,l,result):
+	parameter_file = "timings_counting_bitadder.txt"
+	line = "{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(n,m,e,t,k,l,result)
+	with open(parameter_file, "a") as myfile:
+		myfile.write(line)
+
 def AskContinue(lb,ub,k):
 	print "Probability lies in ({},{})".format(lb,ub)
 	print "Uncertainity = {}".format(ub-lb)

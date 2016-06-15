@@ -147,6 +147,11 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	end_time=0
 	start_time=0
 
+	n = len(stng.g.V)
+	m = len(M)
+	e = len(stng.g.E)
+	l = m
+
 	while True:
 		count_time = end_time-start_time
 		print "Time taken = {}".format(count_time)
@@ -181,7 +186,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 			# Process and save Formula to file
 			glbl_vars.init()
-			cnf_file = "umc_dimacs{}.txt".format(k_crashes)
+			cnf_file = "umc_dimacs{}_{}_{}_{}_{}_{}.txt".format(n,m,e,t,k,l)
 			sol_file = "num_sols.txt"
 			# tact = Tactic('tseitin-cnf')
 			tact = With('tseitin-cnf',distributivity=False)
@@ -195,26 +200,38 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 			print "k_crashes=",k_crashes
 
 			# approxMC, cryptominsat take too long to run
-			# # Run approxMC on file
-			# # print_time("##################running MIS on file...")
-			# # cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
-			# # run_bash(cmd)
-			# # with open("mis.out", "r") as f_temp:
-			# # 	c_ind = f_temp.read()
-			# # 	c_ind = "c ind {}".format(c_ind[2:])
-			# # with open("mis.out", "w") as f_temp:
-			# # 	f_temp.write(c_ind)
-			# # cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
-			# # run_bash(cmd)
-			# print_time("##################running approxMC on file...")
-			# cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
-			# run_bash(cmd)
+			start1=time.time()
+			# Run approxMC on file
+			print_time("##################running MIS on file...")
+			cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
+			run_bash(cmd)
+			with open("mis.out", "r") as f_temp:
+				c_ind = f_temp.read()
+				c_ind = "c ind {}".format(c_ind[2:])
+			with open("mis.out", "w") as f_temp:
+				f_temp.write(c_ind)
+			cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
+			run_bash(cmd)
+			time_1=time.time()-start1
 
+			start1=time.time()
+			print_time("##################running approxMC on file...")
+			cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
+			run_bash(cmd)
+			time_2=time.time()-start1
+
+			start1=time.time()
 			# Run sharpSAT on file
 			print_time("#################running sharpSAT on file...")
 			cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
 			run_bash(cmd)
+			time_3=time.time()-start1
 
+			timing_result = '{}+{}/{}\t='.format(time_1, time_2, time_3, (time_1+time_2)/time_3)
+			if (time_1+time_2)/time_3 < 1:
+				timing_result += "\tINTERESTING"
+			save_counting_parameters(n,m,e,t,k_crashes,l,str(timing_result))
+		
 			# Process sharpSat output to get #Sols
 			print_time("################reading sharpSat's output...")
 			numSols = process_sharpSat_output(sol_file)
@@ -473,10 +490,10 @@ def CEGAR(stng, M, t, l,
 		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
 
-		# prob = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
-		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		prob = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
 		end_time = time.time()
 		count_time = end_time-start_time
