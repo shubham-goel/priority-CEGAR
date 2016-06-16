@@ -175,6 +175,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 			upper_bound -= p1
 
 		else:
+			# BIT-ADDED BASED SAT COUNTING
 			# COMPUTES ONLY BOUNDS ON PRIORITY
 			k_maxSimulationConstraints_BOOL(stng,s, t, exact=True,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
@@ -328,7 +329,7 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 
 def marco_polo_Score(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
-	epsilon=0.2,confidence=0.8):
+	epsilon=0.2,confidence=0.8,RR='edge'):
 
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
@@ -340,18 +341,23 @@ def marco_polo_Score(stng, pr, M, t, l,
 	successful_iter = 0
 
 	for i in range(num_iterations):
-		print 'running iteration {}'.format(i)
-		sim_result = rand_sim_EdgeRR(stng, pr, M, t, l,
-						p_omissions=p_omissions,p_crashes=p_crashes)
+		# print 'running iteration {}'.format(i)
+		if RR=='edge':
+			sim_result = rand_sim_EdgeRR(stng, pr, M, t, l,
+							p_omissions=p_omissions,p_crashes=p_crashes)
+		elif RR=='message':
+			sim_result = rand_sim_MessageRR(stng, pr, M, t, l,
+							p_omissions=p_omissions,p_crashes=p_crashes)
+		else:
+			raise
 
 		if sim_result:
-			print 'successful sim!'
+			# print 'successful sim!'
 			successful_iter += 1
 
-		print 'prob={}\n'.format(float(successful_iter)/float(i+1))
+		# print 'prob={}\n'.format(float(successful_iter)/float(i+1))
 
 	return float(successful_iter)/float(num_iterations)
-
 
 def rand_sim_EdgeRR(stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
@@ -444,6 +450,62 @@ def rand_sim_EdgeRR(stng, pr, M, timeout, l,
 
 	return len(msg_arrived) >= l
 
+def rand_sim_MessageRR(stng, pr, M, timeout, l,
+	p_omissions=0,p_crashes=0):
+
+	sim_vars = Sim_Vars()
+
+	# Setup initial config
+	for m in M:
+		sim_vars.config[m] = m.s
+
+	# Reset vars
+	for e in stng.g.E:
+		sim_vars.crash[e] = False
+		sim_vars.used[e] = False
+
+	msg_arrived = []
+	T=[]
+
+	# ITERATE FOR EVERY TIME
+	for time in range(timeout):
+		# reset edge usage
+		for e in stng.g.E:
+			sim_vars.used[e] = False
+
+		# Choose edges to crash
+		for e in stng.g.E:
+			sim_vars.crash[e] = sim_vars.crash[e] or get_prob_true(p_crashes)
+			if sim_vars.crash[e]:
+				T.append(e)
+
+		# Attempt to send highest priority mesages over link
+		for v in stng.g.V:
+			for m in pr[v]:
+				if v == sim_vars.config[m]:
+					next_e = None
+					for e in stng.edge_priority[m][v]:
+						if not sim_vars.used[e] and not sim_vars.crash[e]:
+							next_e = e
+							break
+					sim_vars.used[m] = next_e
+					if next_e is not None:
+						sim_vars.used[next_e] = True
+
+		# Decide if edges  omit
+		for m in M:
+			e = sim_vars.used[m]
+			if e is not None:
+				assert sim_vars.config[m] == e.s
+				sim_vars.omit[e] = get_prob_true(p_omissions)
+
+				# Update message config
+				if sim_vars.omit[e] == False:
+					sim_vars.config[m] = e.t
+					if e.t == m.t:
+						msg_arrived.append(m)
+
+	return len(msg_arrived) >= l
 
 def saboteurProbability(stng,s,pr,M,t,l,
 	k_omissions=0,k_crashes=0,k_delays=0,
@@ -579,10 +641,10 @@ def CEGAR(stng, M, t, l,
 
 		print_message_priorities(stng,mdl,M)
 
-		p_omissions=0.2
-		p_crashes=0.2
+		p_omissions=0.0
+		p_crashes=0.5
 		p_delays=0
-		precision=7
+		precision=50
 
 		p_omissions=reduce_precision(p_omissions,precision)
 		p_crashes=reduce_precision(p_crashes,precision)
@@ -591,13 +653,21 @@ def CEGAR(stng, M, t, l,
 		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
 
-		# prob = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
-		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		# prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
-		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob = marco_polo_Score(stng, pr, M, t, l,
+		prob0 = successProb(stng, pr, M, t, l,optimize=True,naive=True,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		prob1 = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		prob2e = marco_polo_Score(stng, pr, M, t, l,RR='edge',
 					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.005,confidence=0.99)
+					epsilon=0.0001,confidence=0.999999)
+		prob2m = marco_polo_Score(stng, pr, M, t, l,RR='message',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.0001,confidence=0.999999)
+		print prob0,prob0a, prob1, prob2e, prob2m
+
+		prob = prob1
 
 		end_time = time.time()
 		count_time = end_time-start_time

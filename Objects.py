@@ -133,6 +133,7 @@ class Vars:
 class Sim_Vars:
 	def __init__(self):
 		self.queue = {}
+		self.config = {}
 		self.crash = {}
 		self.delay = {}
 		self.omit = {}
