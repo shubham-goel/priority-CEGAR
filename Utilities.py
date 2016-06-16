@@ -18,7 +18,7 @@ from Graph import GenerateSetting
 # PROBABILITY
 #############
 
-def prob_crash_parameters(e,t,p_crashes=0,k_crashes=0,precision=None):
+def prob_crash_parameters(e,t,p_crashes=0,k_crashes=0,precision=None,immediatefailure=None):
 	if precision is not None:
 		a1=Decimal(comb(e,k_crashes,exact=True))
 
@@ -32,13 +32,19 @@ def prob_crash_parameters(e,t,p_crashes=0,k_crashes=0,precision=None):
 			k_crashes=Decimal(k_crashes)
 
 			a = a1*((one-p_crashes)**((e-k_crashes)*t))
-			b=one-((one-p_crashes)**(t))
+			if immediatefailure is None:
+				b=one-((one-p_crashes)**(t))
+			else:
+				b=((one-p_crashes)**(immediatefailure))*p_crashes
 			res = a*(b**k_crashes)
 		res = +res
 		return res
 	else:
 		a=comb(e,k_crashes,exact=True)*pow(1-p_crashes,(e-k_crashes)*t)
-		b=1-pow(1-p_crashes,t)
+		if immediatefailure is None:
+			b=1-pow(1-p_crashes,t)
+		else:
+			b=pow(1-p_crashes,immediatefailure)*p_crashes
 		return a*pow(b,k_crashes)
 
 def prob_not_AMA(e,t,p_crashes=0,k_crashes=0,k_crashes_sum=None,precision=None):
@@ -80,14 +86,15 @@ def get_model_prob(stng,crash_model,t,M,p_crashes=0,k_crashes=0):
 
 def crashesProbability(stng,M,t,crashed=0,
 	k_omissions=0,k_crashes=0,k_delays=0,
-	p_omissions=0,p_crashes=0,p_delays=0):
+	p_omissions=0,p_crashes=0,p_delays=0,
+	immediatefailure=None):
 	'''
 	Returns the probability that exactly k crashes/delays/omissions occur
 	'''
 	checkSupport(k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
 	num_edges = len(stng.g.E)-crashed
-	return prob_crash_parameters(num_edges,t,
+	return prob_crash_parameters(num_edges,t,immediatefailure=immediatefailure,
 			p_crashes=p_crashes,k_crashes=k_crashes)
 
 ######

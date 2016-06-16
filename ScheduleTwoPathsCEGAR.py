@@ -133,24 +133,22 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 		s = myGoal()
 
 	defineSimulationVariables(stng, M, t)
-	generalSimulationConstraints(stng,s, M, t, l)
 	specificSimulationConstraints(stng, s, pr, M, t, l)
 
 	lower_bound=0
 	upper_bound=1
 
-
-	k_omissions=0
-	k_crashes=0
-	k_delays=0
-
-	end_time=0
-	start_time=0
-
 	n = len(stng.g.V)
 	m = len(M)
 	e = len(stng.g.E)
 	l = m
+
+	k_omissions=0
+	k_crashes=e/3
+	k_delays=0
+
+	end_time=0
+	start_time=0
 
 	while True:
 		count_time = end_time-start_time
@@ -185,74 +183,109 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 			k_maxSimulationConstraints_BOOL(stng,s, t, exact=True,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
-			# Process and save Formula to file
-			glbl_vars.init()
-			cnf_file = "umc_dimacs{}_{}_{}_{}_{}_{}.txt".format(n,m,e,t,k,l)
-			sol_file = "num_sols.txt"
-			# tact = Tactic('tseitin-cnf')
-			tact = With('tseitin-cnf',distributivity=False)
-			print_time("cnf to dimacs...")
-			cnf = tact(s.get_goal())[0]
-			print "Number of clauses = ",len(cnf)
-			dimacs = cnf_to_DIMACS(cnf)
-			print_time("saving dimacs to file...")
-			save_DIMACS_to_file(dimacs,cnf_file)
+			for fail_at in range(t):
+				print 'running at time={}'.format(fail_at)
 
-			print "k_crashes=",k_crashes
+				s.push()
 
-			# approxMC, cryptominsat take too long to run
-			start1=time.time()
-			# Run approxMC on file
-			print_time("##################running MIS on file...")
-			cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
-			run_bash(cmd)
-			with open("mis.out", "r") as f_temp:
-				c_ind = f_temp.read()
-				c_ind = "c ind {}".format(c_ind[2:])
-			with open("mis.out", "w") as f_temp:
-				f_temp.write(c_ind)
-			cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
-			run_bash(cmd)
-			time_1=time.time()-start1
+				generalSimulationConstraints(stng,s, M, t, l, immediatefailure=fail_at)
 
-			start1=time.time()
-			print_time("##################running approxMC on file...")
-			cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
-			run_bash(cmd)
-			time_2=time.time()-start1
+				# Process and save Formula to file
+				glbl_vars.init()
+				cnf_file = "umc_dimacs{}_{}_{}_{}_{}_{}.txt".format(n,m,e,t,k_crashes,l)
+				sol_file = "num_sols.txt"
+				# tact = Tactic('tseitin-cnf')
+				tact = With('tseitin-cnf',distributivity=False)
+				print_time("cnf to dimacs...")
+				cnf = tact(s.get_goal())[0]
+				print "Number of clauses = ",len(cnf)
+				dimacs = cnf_to_DIMACS(cnf)
+				print_time("saving dimacs to file...")
+				save_DIMACS_to_file(dimacs,cnf_file)
+				print "k_crashes=",k_crashes
 
-			start1=time.time()
-			# Run sharpSAT on file
-			print_time("#################running sharpSAT on file...")
-			cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
-			run_bash(cmd)
-			time_3=time.time()-start1
+				start1=time.time()
+				# Run sharpSAT on file
+				print_time("#################running sharpSAT on file...")
+				cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
+				run_bash(cmd)
+				time_3=time.time()-start1
 
-			timing_result = '{}+{}/{}\t='.format(time_1, time_2, time_3, (time_1+time_2)/time_3)
-			if (time_1+time_2)/time_3 < 1:
-				timing_result += "\tINTERESTING"
-			save_counting_parameters(n,m,e,t,k_crashes,l,str(timing_result))
-		
-			# Process sharpSat output to get #Sols
-			print_time("################reading sharpSat's output...")
-			numSols = process_sharpSat_output(sol_file)
-			print "num_sols={}".format(numSols)
+				# Process sharpSat output to get #Sols
+				print_time("################reading sharpSat's output...")
+				numSols_sharpSAT = process_sharpSat_output(sol_file)
+				print "num_sols={}".format(numSols_sharpSAT)
+				numSols=numSols_sharpSAT
 
-			lb=numSols*((1-p_crashes)**(t*(len(stng.g.E))-k_crashes))*(p_crashes**k_crashes)
-			ub=numSols*((1-p_crashes)**(t*(len(stng.g.E)-k_crashes)))*(p_crashes**k_crashes)
-			print "lb={}, ub={}".format(lb,ub)
+				if time_3 > 300:
+					# approxMC, cryptominsat take too long to run
+					start1=time.time()
+					# Run approxMC on file
+					print_time("##################running MIS on file...")
+					cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
+					run_bash(cmd)
+					with open("mis.out", "r") as f_temp:
+						c_ind = f_temp.read()
+						c_ind = "c ind {}".format(c_ind[2:])
+					with open("mis.out", "w") as f_temp:
+						f_temp.write(c_ind)
+					cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
+					run_bash(cmd)
+					time_1=time.time()-start1
 
-			p2 = crashesProbability(stng,M,t,
-				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
-				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-			print "p2={}".format(p2)
+					start1=time.time()
+					print_time("##################running approxMC on file...")
+					cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
+					run_bash(cmd)
+					time_2=time.time()-start1
 
-			# Update Bounds
-			lower_bound += p2 - ub
-			upper_bound -= lb
 
-			if lower_bound<0:
-				lower_bound = 0
+					# Process sharpSat output to get #Sols
+					print_time("################reading approxMC's output...")
+					numSols_approxMC = process_approxMC_output(sol_file)
+					print "num_sols={}".format(numSols_approxMC)
+
+					assert ((numSols_sharpSAT-numSols_approxMC)/numSols_sharpSAT)**2 < 0.1
+
+					timing_result = '{}+{}/{}\t={}'.format(time_1, time_2, time_3, ((time_1+time_2)*1.0/time_3))
+					if time_3 > 300:
+						timing_result += "\tINTERESTING"
+
+					if (time_2)*1.0/time_3 < 1:
+						timing_result += "\tAPPROXIMATION ROCKS"
+
+				else:
+					timing_result = '#sat is too quick... {}'.format(time_3)
+
+				save_counting_parameters(n,m,e,t,k_crashes,l,str(timing_result))
+
+				# Process sharpSat output to get #Sols
+				print_time("################reading sharpSat's output...")
+				numSols = process_sharpSat_output(sol_file)
+				print "num_sols={}".format(numSols)
+
+				lb=numSols*((1-p_crashes)**(t*(len(stng.g.E)-k_crashes)+fail_at*k_crashes))*(p_crashes**k_crashes)
+				ub=lb
+				print "lb={}, ub={}".format(lb,ub)
+
+				s.pop()
+
+				p2 = crashesProbability(stng,M,t,immediatefailure=fail_at,
+					k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+				print "p2={}".format(p2)
+
+				# Update Bounds
+				lower_bound += p2 - ub
+				upper_bound -= lb
+
+				if lower_bound<0:
+					lower_bound = 0
+
+				print (lower_bound,upper_bound)
+
+				if k_crashes==0:
+					break
 
 			# USE FOR DEBUGGING
 			# counter = 0
@@ -477,7 +510,7 @@ def CEGAR(stng, M, t, l,
 		# if save_priority:
 		# 	save_priority_to_file(stng, pr, "priorities.curr")
 
-		# print_message_priorities(stng,mdl,M)
+		print_message_priorities(stng,mdl,M)
 
 		p_omissions=0
 		p_crashes=0.01
@@ -578,9 +611,9 @@ def main(n, m, e, t, l,
 	vars = Vars()
 
 	stng = Glbl(g, vars, FCe, FCv, SCv, SCe, UFSv, getEdgePriorities(g, FCv, UFSv, M))
-	# printMessagesInfo(stng, M)
-	# print "\n"
-	# print_priorities(stng,M)
+	printMessagesInfo(stng, M)
+	print "\n"
+	print_priorities(stng,M)
 
 	print_time("Starting Cegar loop...")
 	S = CEGAR(stng, M, t, l,
