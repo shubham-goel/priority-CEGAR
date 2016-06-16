@@ -130,6 +130,14 @@ class Vars:
 	def msg(self, m):
 		return self.vars[m]
 
+class Sim_Vars:
+	def __init__(self):
+		self.queue = {}
+		self.crash = {}
+		self.delay = {}
+		self.omit = {}
+		self.used = {}
+
 class Vertex:
 	def __init__(self, name):
 		self.name = name

@@ -6,6 +6,7 @@ import time
 import pickle
 import itertools
 import subprocess
+import numpy as np
 from optparse import OptionParser
 
 from z3 import *
@@ -17,6 +18,10 @@ from Graph import GenerateSetting
 #############
 # PROBABILITY
 #############
+
+def get_prob_true(p):
+	r = np.random.choice(2,1,p=[1-p, p])
+	return r[0]==1
 
 def prob_crash_parameters(e,t,p_crashes=0,k_crashes=0,precision=None):
 	if precision is not None:
@@ -263,7 +268,6 @@ def float_dec2bin(d, max_len = 25):
 	exp = len(bin_string)
 
 	glbl_vars.float_dec2bin_dict[d] = (bin_string,exp)
-	print "d,bit_str,expo = {},{},{}".format(d,bin_string,exp)
 	return bin_string,exp
 
 def reduce_precision(p,precision):
@@ -278,7 +282,6 @@ def reduce_precision(p,precision):
 		power /= 2.0
 		if bin_str[i] == '1':
 			number += power
-	print "returning",number
 	return number
 
 

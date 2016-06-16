@@ -326,12 +326,130 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 
 	return +prob
 
+def marco_polo_Score(stng, pr, M, t, l,
+	p_omissions=0,p_crashes=0,p_delays=0,
+	epsilon=0.2,confidence=0.8):
+
+	assert epsilon>0 and epsilon<1
+	assert confidence>0 and confidence<1
+
+	num_iterations = 1/(2*float(epsilon))*math.log(1/(1-float(confidence)))
+	num_iterations = int(math.ceil(num_iterations))
+	print 'num_iterations',num_iterations
+
+	successful_iter = 0
+
+	for i in range(num_iterations):
+		print 'running iteration {}'.format(i)
+		sim_result = rand_sim_EdgeRR(stng, pr, M, t, l,
+						p_omissions=p_omissions,p_crashes=p_crashes)
+
+		if sim_result:
+			print 'successful sim!'
+			successful_iter += 1
+
+		print 'prob={}\n'.format(float(successful_iter)/float(i+1))
+
+	return float(successful_iter)/float(num_iterations)
+
+
+def rand_sim_EdgeRR(stng, pr, M, timeout, l,
+	p_omissions=0,p_crashes=0):
+
+	sim_vars = Sim_Vars()
+
+	for e in stng.g.E:
+		sim_vars.queue[e] = []
+
+	# Setup Initial queues
+	for m in M:
+		v = m.s
+		e = stng.edge_priority[m][v][0]
+		sim_vars.queue[e].append(m)
+
+	for e in stng.g.E:
+		sim_vars.crash[e] = False
+
+	msg_arrived = []
+	T=[]
+
+	# ITERATE FOR EVERY TIME
+	for time in range(timeout):
+		# Choose edges to crash
+		for e in stng.g.E:
+			sim_vars.crash[e] = sim_vars.crash[e] or get_prob_true(p_crashes)
+			if sim_vars.crash[e]:
+				T.append(e)
+
+		# Move mesages to new queue
+		for e in T:
+			for m in sim_vars.queue[e]:
+
+				# Find first message with lower priority that hasn't crashed
+				e2 = e
+				while e2!=None and sim_vars.crash[e2]:
+					assert e2.s == e.s
+					index_curr = stng.edge_priority[m][e2.s].index(e2)
+					index_curr += 1
+					try:
+						e2 = stng.edge_priority[m][e2.s][index_curr]
+					except IndexError:
+						e2 = None
+
+				if e2 is not None:
+					sim_vars.queue[e].remove(m)
+					sim_vars.queue[e2].append(m)
+
+		# Attempt to send mesages over link
+		for e in stng.g.E:
+			if not sim_vars.crash[e]:
+				# Find highest priority message in queue and send it
+				status = True
+				for m in pr[e.s]:
+					if m in sim_vars.queue[e]:
+						# Found message in queue
+						if status:
+							# This is the first message we got
+							sim_vars.used[m] = e
+							status = False
+
+							assert m in sim_vars.queue[e]
+
+						else:
+							# All lower priority messages should not move
+							sim_vars.used[m] = None
+			else:
+				# The messages in this queue should not move
+				for m in sim_vars.queue[e]:
+					sim_vars.used[m] = None
+
+		# Decide if edges  omit
+		for m in M:
+			e = sim_vars.used[m]
+
+			if e is not None:
+
+				assert m in sim_vars.queue[e]
+
+				sim_vars.omit[e] = get_prob_true(p_omissions)
+				if sim_vars.omit[e] == False:
+					if e.t == m.t:
+						sim_vars.queue[e].remove(m)
+						msg_arrived.append(m)
+						sim_vars.used[m] = None
+					else:
+						next_edge = stng.edge_priority[m][e.t][0]
+						sim_vars.queue[e].remove(m)
+						sim_vars.queue[next_edge].append(m)
+
+	return len(msg_arrived) >= l
+
+
 def saboteurProbability(stng,s,pr,M,t,l,
 	k_omissions=0,k_crashes=0,k_delays=0,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	optimize=False):
 
-	# print "Crash parameters",k_omissions,k_crashes,k_delays
 	checkSupport(k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
 	count=0
@@ -459,10 +577,10 @@ def CEGAR(stng, M, t, l,
 		# if save_priority:
 		# 	save_priority_to_file(stng, pr, "priorities.curr")
 
-		# print_message_priorities(stng,mdl,M)
+		print_message_priorities(stng,mdl,M)
 
-		p_omissions=0
-		p_crashes=0.01
+		p_omissions=0.2
+		p_crashes=0.2
 		p_delays=0
 		precision=7
 
@@ -475,8 +593,11 @@ def CEGAR(stng, M, t, l,
 
 		# prob = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
 		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
-				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# prob = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		# 		p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		prob = marco_polo_Score(stng, pr, M, t, l,
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.005,confidence=0.99)
 
 		end_time = time.time()
 		count_time = end_time-start_time
@@ -560,9 +681,9 @@ def main(n, m, e, t, l,
 	vars = Vars()
 
 	stng = Glbl(g, vars, FCe, FCv, SCv, SCe, UFSv, getEdgePriorities(g, FCv, UFSv, M))
-	# printMessagesInfo(stng, M)
-	# print "\n"
-	# print_priorities(stng,M)
+	printMessagesInfo(stng, M)
+	print "\n"
+	print_priorities(stng,M)
 
 	print_time("Starting Cegar loop...")
 	S = CEGAR(stng, M, t, l,
