@@ -334,7 +334,7 @@ def marco_polo_Score(stng, pr, M, t, l,
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
 
-	num_iterations = 1/(2*float(epsilon))*math.log(1/(1-float(confidence)))
+	num_iterations = 1/(2*float(epsilon**2))*math.log(1/(1-float(confidence)))
 	num_iterations = int(math.ceil(num_iterations))
 	print 'num_iterations',num_iterations
 
