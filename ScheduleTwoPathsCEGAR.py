@@ -9,6 +9,7 @@ import subprocess
 import math
 from optparse import OptionParser
 from decimal import Decimal
+import multiprocessing
 
 from z3 import *
 
@@ -126,6 +127,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	'''
 	Returns the probability of pr failing, given the crash parameters
 	'''
+	print 'RUNNING successProb'
 	print p_omissions,p_crashes,p_delays
 	if naive:
 		s = Solver()
@@ -272,6 +274,7 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	Serves the same purpose as successProb
 	Returns the probability of pr failing, given the crash parameters
 	'''
+	print 'RUNNING priorityScore'
 	assert l==len(M)
 	s = Goal()
 
@@ -327,9 +330,10 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 
 	return +prob
 
-def marco_polo_Score(stng, pr, M, t, l,
+def monte_carlo_Score(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge'):
+	print 'RUNNING monte_carlo_Score'
 
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
@@ -341,7 +345,6 @@ def marco_polo_Score(stng, pr, M, t, l,
 	successful_iter = 0
 
 	for i in range(num_iterations):
-		# print 'running iteration {}'.format(i)
 		if RR=='edge':
 			sim_result = rand_sim_EdgeRR(stng, pr, M, t, l,
 							p_omissions=p_omissions,p_crashes=p_crashes)
@@ -352,12 +355,84 @@ def marco_polo_Score(stng, pr, M, t, l,
 			raise
 
 		if sim_result:
-			# print 'successful sim!'
 			successful_iter += 1
 
-		# print 'prob={}\n'.format(float(successful_iter)/float(i+1))
 
 	return float(successful_iter)/float(num_iterations)
+
+def monte_carlo_Score_thread(stng, pr, M, t, l,
+	p_omissions=0,p_crashes=0,p_delays=0,
+	epsilon=0.2,confidence=0.8,RR='edge'):
+	print 'RUNNING monte_carlo_Score_thread'
+
+	assert epsilon>0 and epsilon<1
+	assert confidence>0 and confidence<1
+
+	num_iterations = 1/(2*float(epsilon)**2)*math.log(1/(1-float(confidence)))
+	num_iterations = int(math.ceil(num_iterations))
+	print 'num_iterations',num_iterations
+
+	successful_iter = 0
+
+	jobs=[]
+	remaining_iter = num_iterations
+	manager = multiprocessing.Manager()
+	return_dict = manager.dict()
+
+	num_threads = 4
+
+	for i in range(num_threads):
+		n_iter = (remaining_iter)/(num_threads-i)
+		remaining_iter -= n_iter
+
+		if RR=='edge':
+			p = multiprocessing.Process(target=rand_sim_EdgeRR_thread,
+										args=(return_dict,n_iter, i, stng, pr,
+										M, t, l, p_omissions,p_crashes,))
+		elif RR=='message':
+			p = multiprocessing.Process(target=rand_sim_MessageRR_thread,
+										args=(return_dict,n_iter, i, stng, pr,
+										M, t, l, p_omissions,p_crashes,))
+		else:
+			raise
+
+		jobs.append(p)
+		p.start()
+
+	print 'WAITING FOR PROCESSES TO END...'
+	for p in jobs:
+		p.join()
+	print 'ALL PROCESSES ENDED...'
+
+	iter_count = 0
+	for key in return_dict.keys():
+		successful_iter += return_dict[key][0]
+		iter_count += return_dict[key][1]
+
+	assert iter_count == num_iterations
+
+	print 'return_dict',return_dict
+	return float(successful_iter)/float(num_iterations)
+
+def rand_sim_EdgeRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
+	p_omissions=0,p_crashes=0):
+	successful_iter = 0
+	for i in range(num_iter):
+		if rand_sim_EdgeRR(stng, pr, M, t, l,
+				p_omissions=p_omissions,p_crashes=p_crashes):
+			successful_iter+=1
+	output_dict[id_thread] = (successful_iter,num_iter)
+	return (successful_iter,num_iter)
+
+def rand_sim_MessageRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
+	p_omissions=0,p_crashes=0):
+	successful_iter = 0
+	for i in range(num_iter):
+		if rand_sim_MessageRR(stng, pr, M, t, l,
+				p_omissions=p_omissions,p_crashes=p_crashes):
+			successful_iter+=1
+	output_dict[id_thread] = (successful_iter,num_iter)
+	return (successful_iter,num_iter)
 
 def rand_sim_EdgeRR(stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
@@ -527,8 +602,8 @@ def saboteurProbability(stng,s,pr,M,t,l,
 				doomed = get_doomed_state(stng, crash_model, pr, M, t, l,
 							k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
-
 				omitted,crashed,delayed = printCounterexample(stng, crash_model, doomed, M,count=True)
+
 				p1 = get_model_prob(stng,crash_model,doomed,M,
 						p_crashes=p_crashes,k_crashes=crashed)
 				p2 = crashesProbability(stng,M,t-doomed,crashed=crashed,
@@ -605,8 +680,8 @@ def CEGAR(stng, M, t, l,
 
 	# Add HERE more heuristics/constraints
 	# for getting good initial message priorities
-	print_time("implementing heuristic...")
-	prioritySimulationConstraints(stng, s, M, t, pr, l)
+	# print_time("implementing heuristic...")
+	# prioritySimulationConstraints(stng, s, M, t, pr, l)
 
 	print_time("solving z3 program...")
 	mdl = getModel(s)
@@ -642,7 +717,7 @@ def CEGAR(stng, M, t, l,
 		print_message_priorities(stng,mdl,M)
 
 		p_omissions=0.0
-		p_crashes=0.5
+		p_crashes=0.25
 		p_delays=0
 		precision=50
 
@@ -659,20 +734,39 @@ def CEGAR(stng, M, t, l,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 		prob1 = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob2e = marco_polo_Score(stng, pr, M, t, l,RR='edge',
+		prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
 					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.0001,confidence=0.999999)
-		prob2m = marco_polo_Score(stng, pr, M, t, l,RR='message',
+					epsilon=0.01,confidence=0.999999)
+		prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
 					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.0001,confidence=0.999999)
-		print prob0,prob0a, prob1, prob2e, prob2m
+					epsilon=0.01,confidence=0.999999)
+		prob2et = monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.01,confidence=0.999999)
+		prob2mt = monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.01,confidence=0.999999)
+
+		print ''
+		print ''
+		print '#Final Probabilities:'
+		print ''
+		print 'successProb OPT             \t',prob0
+		print 'successProb NO OPT          \t',prob0a
+		print 'priorityScore               \t',prob1
+		print 'monte_carlo edgeRR           \t',prob2e
+		print 'monte_carlo messageRR        \t',prob2m
+		print 'monte_carlo thread edgeRR    \t',prob2et
+		print 'monte_carlo thread messageRR \t',prob2mt
+		print ''
+		print ''
 
 		prob = prob1
 
 		end_time = time.time()
 		count_time = end_time-start_time
-		print "\nProbability Interval = {}\n\n".format(prob)
-		print "Time taken = {}\n\n".format(str(count_time))
+		# print "\nProbability Interval = {}\n\n".format(prob)
+		print "Total Time taken = {}\n\n".format(str(count_time))
 		print "End Time", time.time()
 		return (prob,count_time)
 

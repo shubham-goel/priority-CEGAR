@@ -67,3 +67,5 @@ local/*
 */local/*
 *.curr
 schedules/*
+umc*
+output*
