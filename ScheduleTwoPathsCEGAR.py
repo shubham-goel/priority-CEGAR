@@ -198,7 +198,7 @@ def saboteurProbability(stng,s,pr,M,t,l,
 
 				omitted,crashed,delayed = printCounterexample(stng, crash_model, doomed, M,count=True)
 				p1 = get_model_prob(stng,crash_model,doomed,M,
-						p_crashes=p_crashes,k_crashes=k_crashes)
+						p_crashes=p_crashes,k_crashes=crashed)
 				p2 = crashesProbability(stng,M,t-doomed,crashed=crashed,
 						k_omissions=k_omissions-omitted,k_crashes=k_crashes-crashed,k_delays=k_delays-delayed,
 						p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
