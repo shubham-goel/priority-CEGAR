@@ -6,8 +6,9 @@ import pickle
 import matplotlib.pyplot as plt
 
 from Objects import *
+import matplotlib.pyplot as plt
 
-def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None):
+def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None, custom=False):
 	'''
 	:param n: the number of vertices
 	:param m: the number of messages
@@ -15,10 +16,48 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 	'''
 
 	if load:
-		file = open(filename, 'r')
-		(G, M) =  pickle.load(file)
+		if custom:
+			custom_file = 'custom.setting'
+			with open(custom_file, 'r') as file:
+				status=0
+				num_vertices = 0
+				edges = []
+				messages = []
+				for l in file:
+					l = l.strip(' \n\t')
+					if l== '' : continue
+					if status  == 0:
+						assert l == 'Edges'
+						status += 1
+					elif status == 1:
+						if l == 'Messages':
+							status += 1
+						else:
+							ends=l.split(' ')
+							assert len(ends)==2
+							end1 = int(ends[0])
+							end2 = int(ends[1])
+							edges.append((end1,end2))
+							if max(end1,end2) > num_vertices-1:
+								num_vertices = max(end1,end2) + 1
+					elif status == 2:
+						ends=l.split(' ')
+						assert len(ends)==2
+						end1 = int(ends[0])
+						end2 = int(ends[1])
+						messages.append((end1,end2,len(messages)))
+				assert status==2
 
-		file.close()
+			vertices = range(num_vertices)
+			G = networkx.DiGraph()
+			G.add_nodes_from(vertices)
+			G.add_edges_from(edges)
+			M = messages
+
+		else:
+			with open(filename, 'r') as file:
+				(G, M) =  pickle.load(file)
+
 	else:
 		G = networkx.gnm_random_graph(n, e, directed=True)
 		M = []
@@ -41,6 +80,21 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 	g = Graph(V.values(), E)
 	if load:
 		M = [Message(V[s], V[t], name) for (s,t,name) in M]
+
+	# Printing Graph
+	pos=networkx.spring_layout(G)
+	networkx.draw_networkx_nodes(G,pos,
+								nodelist=range(n),
+								node_color='r',
+								node_size=500,
+								alpha=0.8)
+	networkx.draw_networkx_edges(G,pos,width=1.0,alpha=0.5)
+	labels = {}
+	for temp in range(n):
+		labels[temp] = temp
+	networkx.draw_networkx_labels(G,pos,labels,font_size=16)
+	plt.savefig("graph.png") # save as png
+	# plt.show() # display
 
 	FCv = {} # m -> the vertices in FC[m]
 	FCe = {} # m --> the edges in FV

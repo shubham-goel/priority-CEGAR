@@ -362,7 +362,8 @@ def monte_carlo_Score(stng, pr, M, t, l,
 
 def monte_carlo_Score_thread(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
-	epsilon=0.2,confidence=0.8,RR='edge'):
+	epsilon=0.2,confidence=0.8,RR='edge',
+	num_threads = 5):
 	print 'RUNNING monte_carlo_Score_thread'
 
 	assert epsilon>0 and epsilon<1
@@ -378,8 +379,6 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	remaining_iter = num_iterations
 	manager = multiprocessing.Manager()
 	return_dict = manager.dict()
-
-	num_threads = 4
 
 	for i in range(num_threads):
 		n_iter = (remaining_iter)/(num_threads-i)
@@ -716,8 +715,8 @@ def CEGAR(stng, M, t, l,
 
 		print_message_priorities(stng,mdl,M)
 
-		p_omissions=0.0
-		p_crashes=0.25
+		p_omissions=0.01
+		p_crashes=0.01
 		p_delays=0
 		precision=50
 
@@ -728,36 +727,44 @@ def CEGAR(stng, M, t, l,
 		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
 
-		prob0 = successProb(stng, pr, M, t, l,optimize=True,naive=True,
-					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
-					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob1 = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
-					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.01,confidence=0.999999)
-		prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.01,confidence=0.999999)
+		timings = {}
+
+		# prob0 = successProb(stng, pr, M, t, l,optimize=True,naive=True,
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# timings[-1]=time.time()
+		# prob1 = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# timings[0]=time.time()
+		# prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,
+		# 			epsilon=0.01,confidence=0.999)
+		timings[1]=time.time()
 		prob2et = monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
 					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.01,confidence=0.999999)
+					epsilon=0.01,confidence=0.999)
+		timings[2]=time.time()
+		# prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,
+		# 			epsilon=0.01,confidence=0.999)
+		timings[3]=time.time()
 		prob2mt = monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
 					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.01,confidence=0.999999)
+					epsilon=0.01,confidence=0.999)
+		timings[4]=time.time()
 
 		print ''
 		print ''
 		print '#Final Probabilities:'
 		print ''
-		print 'successProb OPT             \t',prob0
-		print 'successProb NO OPT          \t',prob0a
-		print 'priorityScore               \t',prob1
-		print 'monte_carlo edgeRR           \t',prob2e
-		print 'monte_carlo messageRR        \t',prob2m
-		print 'monte_carlo thread edgeRR    \t',prob2et
-		print 'monte_carlo thread messageRR \t',prob2mt
+		# print 'successProb OPT              \t',prob0
+		# print 'successProb NO OPT           \t',prob0a
+		# print 'priorityScore                \t',prob1,timings[0]-timings[-1]
+		# print 'monte_carlo edgeRR           \t',prob2e,timings[1]-timings[0]
+		print 'monte_carlo thread edgeRR    \t',prob2et,timings[2]-timings[1]
+		# print 'monte_carlo messageRR        \t',prob2m,timings[3]-timings[2]
+		print 'monte_carlo thread messageRR \t',prob2mt,timings[4]-timings[3]
 		print ''
 		print ''
 
@@ -833,18 +840,29 @@ def getEdgePriorities(g, FCv, UFSv, M):
 				edge_priority[m][v].append(edge)
 	return edge_priority
 
+
+# EXTRAS
+def print_edges(stng):
+	print ''
+	print ''
+	for i in range(len(stng.g.E)):
+		print 'edge',i, str(stng.g.E[i])
+	print ''
+	print ''
+
 def main(n, m, e, t, l,
 	k_omissions=0, k_crashes=0, k_delays=0,
-	filename=None, save=False, load=False,
+	filename=None, save=False, load=False, custom=False,
 	optimize=False, showProgress=False, weight=False, countFaults=False,
 	probabalistic=False):
 
 	print_time("generating setting...")
 	(g, M, FCv, FCe, SCv, SCe, UFSv) = GenerateSetting(n, m, e, save=save,
-		load=load, filename=filename, weight=weight)
+		load=load, filename=filename, weight=weight, custom=custom)
 	vars = Vars()
 
 	stng = Glbl(g, vars, FCe, FCv, SCv, SCe, UFSv, getEdgePriorities(g, FCv, UFSv, M))
+	print_edges(stng)
 	printMessagesInfo(stng, M)
 	print "\n"
 	print_priorities(stng,M)
@@ -868,8 +886,9 @@ if __name__ == '__main__':
 
 	(options, args) = parse_arguments()
 
-	save = not options.load
-	load = options.load
+	custom = options.custom
+	load = options.load or custom
+	save = not load
 	optimize = options.optimize
 	showProgress = options.showProgress
 	weight = options.weight
@@ -892,4 +911,4 @@ if __name__ == '__main__':
 	exit_status = main(n,m,e,t,l,
 		k_crashes=k,filename=filename, save=save, load=load, optimize=optimize,
 		showProgress=showProgress, weight=weight, countFaults=countFaults,
-		probabalistic=probabalistic)
+		probabalistic=probabalistic, custom=custom)

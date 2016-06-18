@@ -103,6 +103,8 @@ def AskContinue(lb,ub,k):
 	print "Probability lies in ({},{})".format(lb,ub)
 	print "Uncertainity = {}".format(ub-lb)
 	ques="Do you want to continue with k={}".format(k)
+	print ques
+	return True
 	return query_yes_no(ques,default="yes")
 
 # Ref : http://code.activestate.com/recipes/577058/
@@ -141,22 +143,25 @@ def query_yes_no(question, default="yes"):
 
 def parse_arguments():
 	parser = OptionParser()
-	parser.add_option('-t','--timeout', dest="t",
-				  help="The timeout, should be an integer")
+	# parser.add_option('-t','--timeout', dest="t",
+	# 			  help="The timeout, should be an integer")
 	# parser.add_option("-l", dest="l",
 	# 			  help="The guarantee on the number of messages that should arrive.")
-	parser.add_option("-k", dest="k",
-				  help="#edges that are allowed to crash.")
-	parser.add_option("-n", dest="n",
-				  help="#vertices in the network.")
-	parser.add_option("-m", dest="m",
-				  help="#messages in the network.")
-	parser.add_option("-e", dest="e",
-				  help="#edges in the network.")
+	# parser.add_option("-k", dest="k",
+	# 			  help="#edges that are allowed to crash.")
+	# parser.add_option("-n", dest="n",
+	# 			  help="#vertices in the network.")
+	# parser.add_option("-m", dest="m",
+	# 			  help="#messages in the network.")
+	# parser.add_option("-e", dest="e",
+	# 			  help="#edges in the network.")
 
 	parser.add_option("-l","--load",
 				  action="store_true", dest="load", default=False,
 				  help="Load setting from file")
+	parser.add_option("-m","--manual","--custom",
+				  action="store_true", dest="custom", default=False,
+				  help="Load setting from custom file")
 	parser.add_option("-b","--brute",
 				  action="store_false", dest="optimize", default=True,
 				  help="Dont Optimize")
