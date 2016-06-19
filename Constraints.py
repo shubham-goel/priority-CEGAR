@@ -16,7 +16,7 @@ from Utilities import *
 #######
 
 def generalSimulationConstraints(stng, s, M, t, l,
-	immediatefailure=False, l_is_upperBound=True):
+	immediatefailure=None, l_is_upperBound=True):
 	'''
 	Adds constraints that depend neither on k nor on priority model
 	'''
@@ -58,8 +58,10 @@ def generalSimulationConstraints(stng, s, M, t, l,
 				s.add(Implies(stng.vars.crash(e, i-1), stng.vars.crash(e, i)))
 
 		#require that if an edge fails, it fails at time 0
-		if immediatefailure:
-			s.add(Implies(stng.vars.crash(e, t-1), stng.vars.crash(e, 0)))
+		if immediatefailure is not None:
+			s.add(Implies(stng.vars.crash(e, t-1), 
+							And(stng.vars.crash(e, immediatefailure),
+								Not(stng.vars.crash(e, immediatefailure-1)))))
 
 	# No omission takes place if no message is travelling on link
 	for e in stng.g.E:

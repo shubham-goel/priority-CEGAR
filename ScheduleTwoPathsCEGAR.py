@@ -127,7 +127,9 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	'''
 	Returns the probability of pr failing, given the crash parameters
 	'''
-	print 'RUNNING successProb'
+	print ''
+	print ''
+	print_time('RUNNING successProb...')
 	print p_omissions,p_crashes,p_delays
 	if naive:
 		s = Solver()
@@ -135,12 +137,17 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 		s = myGoal()
 
 	defineSimulationVariables(stng, M, t)
-	generalSimulationConstraints(stng,s, M, t, l)
+	if naive:
+		generalSimulationConstraints(stng,s, M, t, l)
 	specificSimulationConstraints(stng, s, pr, M, t, l)
 
 	lower_bound=0
 	upper_bound=1
 
+	n = len(stng.g.V)
+	m = len(M)
+	e = len(stng.g.E)
+	l = m
 
 	k_omissions=0
 	k_crashes=0
@@ -155,6 +162,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 		if AskContinue(lower_bound,upper_bound,k_crashes) is False:
 			break
 		if k_crashes>len(stng.g.E): break
+		print '----------------------k_crashes =',k_crashes,'-----------------------'
 
 		# create backtracking point for successive values of k
 		s.push()
@@ -182,62 +190,107 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 			k_maxSimulationConstraints_BOOL(stng,s, t, exact=True,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
-			# Process and save Formula to file
-			glbl_vars.init()
-			cnf_file = "umc_dimacs{}.txt".format(k_crashes)
-			sol_file = "num_sols.txt"
-			# tact = Tactic('tseitin-cnf')
-			tact = With('tseitin-cnf',distributivity=False)
-			print_time("cnf to dimacs...")
-			cnf = tact(s.get_goal())[0]
-			print "Number of clauses = ",len(cnf)
-			dimacs = cnf_to_DIMACS(cnf)
-			print_time("saving dimacs to file...")
-			save_DIMACS_to_file(dimacs,cnf_file)
+			for fail_at in range(t):
+				print 'running at time={}'.format(fail_at)
 
-			print "k_crashes=",k_crashes
+				s.push()
 
-			# approxMC, cryptominsat take too long to run
-			# # Run approxMC on file
-			# # print_time("##################running MIS on file...")
-			# # cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
-			# # run_bash(cmd)
-			# # with open("mis.out", "r") as f_temp:
-			# # 	c_ind = f_temp.read()
-			# # 	c_ind = "c ind {}".format(c_ind[2:])
-			# # with open("mis.out", "w") as f_temp:
-			# # 	f_temp.write(c_ind)
-			# # cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
-			# # run_bash(cmd)
-			# print_time("##################running approxMC on file...")
-			# cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
-			# run_bash(cmd)
+				generalSimulationConstraints(stng,s, M, t, l, immediatefailure=fail_at)
 
-			# Run sharpSAT on file
-			print_time("#################running sharpSAT on file...")
-			cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
-			run_bash(cmd)
+				# Process and save Formula to file
+				glbl_vars.init()
+				cnf_file = "umc_dimacs{}_{}_{}_{}_{}_{}.txt".format(n,m,e,t,k_crashes,l)
+				sol_file = "num_sols.txt"
+				# tact = Tactic('tseitin-cnf')
+				tact = With('tseitin-cnf',distributivity=False)
+				print_time("cnf to dimacs...")
+				cnf = tact(s.get_goal())[0]
+				print "Number of clauses = ",len(cnf)
+				dimacs = cnf_to_DIMACS(cnf)
+				print_time("saving dimacs to file...")
+				save_DIMACS_to_file(dimacs,cnf_file)
+				print "k_crashes=",k_crashes
 
-			# Process sharpSat output to get #Sols
-			print_time("################reading sharpSat's output...")
-			numSols = process_sharpSat_output(sol_file)
-			print "num_sols={}".format(numSols)
+				start1=time.time()
+				# Run sharpSAT on file
+				print_time("#################running sharpSAT on file...")
+				cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
+				run_bash(cmd)
+				time_3=time.time()-start1
 
-			lb=numSols*((1-p_crashes)**(t*(len(stng.g.E))-k_crashes))*(p_crashes**k_crashes)
-			ub=numSols*((1-p_crashes)**(t*(len(stng.g.E)-k_crashes)))*(p_crashes**k_crashes)
-			print "lb={}, ub={}".format(lb,ub)
+				# Process sharpSat output to get #Sols
+				print_time("################reading sharpSat's output...")
+				numSols_sharpSAT = process_sharpSat_output(sol_file)
+				print "num_sols={}".format(numSols_sharpSAT)
+				numSols=numSols_sharpSAT
 
-			p2 = crashesProbability(stng,M,t,
-				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
-				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-			print "p2={}".format(p2)
+				if time_3 > 300:
+					# approxMC, cryptominsat take too long to run
+					start1=time.time()
+					# Run approxMC on file
+					print_time("##################running MIS on file...")
+					cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
+					run_bash(cmd)
+					with open("mis.out", "r") as f_temp:
+						c_ind = f_temp.read()
+						c_ind = "c ind {}".format(c_ind[2:])
+					with open("mis.out", "w") as f_temp:
+						f_temp.write(c_ind)
+					cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
+					run_bash(cmd)
+					time_1=time.time()-start1
 
-			# Update Bounds
-			lower_bound += p2 - ub
-			upper_bound -= lb
+					start1=time.time()
+					print_time("##################running approxMC on file...")
+					cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
+					run_bash(cmd)
+					time_2=time.time()-start1
 
-			if lower_bound<0:
-				lower_bound = 0
+
+					# Process sharpSat output to get #Sols
+					print_time("################reading approxMC's output...")
+					numSols_approxMC = process_approxMC_output(sol_file)
+					print "num_sols={}".format(numSols_approxMC)
+
+					assert ((numSols_sharpSAT-numSols_approxMC)/numSols_sharpSAT)**2 < 0.1
+
+					timing_result = '{}+{}/{}\t={}'.format(time_1, time_2, time_3, ((time_1+time_2)*1.0/time_3))
+					if time_3 > 300:
+						timing_result += "\tINTERESTING"
+
+					if (time_2)*1.0/time_3 < 1:
+						timing_result += "\tAPPROXIMATION ROCKS"
+
+				else:
+					timing_result = '#sat is too quick... {}'.format(time_3)
+
+				save_counting_parameters(n,m,e,t,k_crashes,l,str(timing_result))
+
+				numSols = numSols_sharpSAT
+				print "num_sols={}".format(numSols)
+
+				lb=numSols*((1-p_crashes)**(t*(len(stng.g.E)-k_crashes)+fail_at*k_crashes))*(p_crashes**k_crashes)
+				ub=lb
+				print "lb={}, ub={}".format(lb,ub)
+
+				s.pop()
+
+				p2 = crashesProbability(stng,M,t,immediatefailure=fail_at,
+					k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+				print "p2={}".format(p2)
+
+				# Update Bounds
+				lower_bound += p2 - ub
+				upper_bound -= lb
+
+				if lower_bound<0:
+					lower_bound = 0
+
+				print (lower_bound,upper_bound)
+
+				if k_crashes==0:
+					break
 
 			# USE FOR DEBUGGING
 			# counter = 0
@@ -266,6 +319,9 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 		k_crashes=k_crashes+1
 		k_delays=0
 
+	print_time('RETURNING successProb...')
+	print ''
+	print ''
 	return (lower_bound,upper_bound)
 
 def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
@@ -275,7 +331,9 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	Returns the probability of pr failing, given the crash parameters
 	Implements a MessageRR Algorithm
 	'''
-	print 'RUNNING priorityScore'
+	print ''
+	print ''
+	print_time('RUNNING priorityScore...')
 	assert l==len(M)
 	s = Goal()
 
@@ -329,12 +387,17 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	print "denom = {}".format(denom)
 	print "prob = {}".format(+prob)
 
+	print ''
+	print ''
+	print_time('RETURNING priorityScore...')
 	return +prob
 
 def monte_carlo_Score(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge'):
-	print_time('RUNNING monte_carlo_Score')
+	print ''
+	print ''
+	print_time('RUNNING monte_carlo_Score...')
 
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
@@ -358,7 +421,9 @@ def monte_carlo_Score(stng, pr, M, t, l,
 		if sim_result:
 			successful_iter += 1
 
-	print_time('ENDED monte_carlo_Score')
+	print_time('RETURNING monte_carlo_Score...')
+	print ''
+	print ''
 
 	return float(successful_iter)/float(num_iterations)
 
@@ -366,7 +431,9 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge',
 	num_threads = 5):
-	print_time('RUNNING monte_carlo_Score_thread')
+	print ''
+	print ''
+	print_time('RUNNING monte_carlo_Score_thread...')
 
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
@@ -413,7 +480,9 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	assert iter_count == num_iterations
 
 	print 'return_dict',return_dict
-	print_time('ENDED monte_carlo_Score_thread')
+	print_time('RETURNING monte_carlo_Score_thread...')
+	print ''
+	print ''
 	return float(successful_iter)/float(num_iterations)
 
 def rand_sim_EdgeRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
@@ -729,12 +798,15 @@ def CEGAR(stng, M, t, l,
 
 		timings = {}
 
-		# timings[-3]=time.time()
-		# prob0o = successProb(stng, pr, M, t, l,optimize=True,naive=True,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		# timings[-2]=time.time()
-		# prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		timings[-4]=time.time()
+		prob0b = successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		timings[-3]=time.time()
+		prob0o = successProb(stng, pr, M, t, l,optimize=True,naive=True,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		timings[-2]=time.time()
+		prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 		timings[-1]=time.time()
 		prob1e = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
@@ -744,17 +816,17 @@ def CEGAR(stng, M, t, l,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='message')
 		timings[0.1]=time.time()
-		# prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=0.01,confidence=0.999)
+		prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.01,confidence=0.999)
 		timings[1]=time.time()
 		prob2et = monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
 					p_omissions=p_omissions,p_crashes=p_crashes,
 					epsilon=0.01,confidence=0.999)
 		timings[2]=time.time()
-		# prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=0.01,confidence=0.999)
+		prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.01,confidence=0.999)
 		timings[3]=time.time()
 		prob2mt = monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
 					p_omissions=p_omissions,p_crashes=p_crashes,
@@ -765,13 +837,14 @@ def CEGAR(stng, M, t, l,
 		print ''
 		print '#Final Probabilities:'
 		print ''
-		# print 'successProb OPT              \t',prob0o,timings[-2]-timings[-3]
-		# print 'successProb NO OPT           \t',prob0a,timings[-1]-timings[-2]
+		print 'successProb bit-adder        \t',prob0b,timings[-3]-timings[-4]
+		print 'successProb OPT              \t',prob0o,timings[-2]-timings[-3]
+		print 'successProb NO OPT           \t',prob0a,timings[-1]-timings[-2]
 		print 'priorityScore edgeRR         \t',prob1e,timings[0]-timings[-1]
 		print 'priorityScore messageRR      \t',prob1m,timings[0.1]-timings[0]
-		# print 'monte_carlo edgeRR           \t',prob2e,timings[1]-timings[0.1]
+		print 'monte_carlo edgeRR           \t',prob2e,timings[1]-timings[0.1]
 		print 'monte_carlo thread edgeRR    \t',prob2et,timings[2]-timings[1]
-		# print 'monte_carlo messageRR        \t',prob2m,timings[3]-timings[2]
+		print 'monte_carlo messageRR        \t',prob2m,timings[3]-timings[2]
 		print 'monte_carlo thread messageRR \t',prob2mt,timings[4]-timings[3]
 		print ''
 		print ''
