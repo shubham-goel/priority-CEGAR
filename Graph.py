@@ -4,6 +4,7 @@ import random
 import itertools
 import pickle
 import matplotlib.pyplot as plt
+import os
 
 from Objects import *
 import matplotlib.pyplot as plt
@@ -147,7 +148,7 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 				p = networkx.shortest_path(G, source=s, target=t, weight='weight')
 		except NetworkXNoPath:
 			print "NO PATH"
-			return None
+			os._exit(1)
 
 		for v in p[1:]:
 			nextV = V[v]

@@ -1,25 +1,47 @@
 #!/bin/bash
+rm -rf new_results/
+mkdir new_results
+cd new_results
+mkdir old_results
+cp -avr ../results/* old_results/
+cd ..
+rm -rf results
+mv new_results results
 
-k=1
-for nodes in `seq 11 50`;
+k=0
+for nodes in `seq 4 50`;
 do
-	start_edges=$((3*$nodes))
-	end_edges=$((3*$nodes))
+	start_edges=$((2*$nodes))
+	end_edges=$((2*$nodes))
 	for edges in `seq $start_edges $end_edges`;
 	do
-		for messages in `seq 10 10`;
+		start_messages=$(($nodes))
+		end_messages=$(($nodes))
+		for messages in `seq $start_messages $end_messages`;
 		do
-			start_timeout=$(($nodes-2))
-			end_timeout=$(($nodes-2))
+			start_timeout=$(($nodes))
+			end_timeout=$(($nodes))
 			for timeout in `seq $end_timeout -1 $start_timeout`;
 			do
 				l=$(($messages))
-
-				directory="$nodes-$messages-$edges-$timeout-$k-$l"
-				echo "BEGINNING NEW SETTING"
-				echo "Progress : $directory::(10-20)-(10-11)-($start_edges-$end_edges)-($end_timeout-$start_timeout)-$k-$l"
-				python ScheduleTwoPathsCEGAR.py $nodes $messages $edges $timeout $k $l -p
-
+				status=1
+				while [  $status -ne 0 ]; do
+					directory="n$nodes-m$messages-e$edges-t$timeout-l$l"
+					echo ''
+					echo ''
+					echo ''
+					echo "BEGINNING NEW SETTING"
+					echo "Progress : $directory::(10-20)-(10-11)-($start_edges-$end_edges)-($end_timeout-$start_timeout)-$l-$k"
+					echo ''
+					echo ''
+					python ScheduleTwoPathsCEGAR.py $nodes $messages $edges $timeout $l $k -p  > output.curr
+					status=$?
+					echo "Exit Status=$status"
+					if [ $status -eq 0 ]; then
+						cp settings.curr "results/$directory.setting"
+						cp output.curr "results/$directory.output"
+					fi
+				done
 			done
 		done
 	done
