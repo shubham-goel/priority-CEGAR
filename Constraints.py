@@ -43,6 +43,7 @@ def generalSimulationConstraints(stng, s, M, t, l,
 
 					s.add(Implies(stng.vars.used(m,e,i),if_else))
 
+				# If a message doesn't use any link, it should stay where it is
 				m_uses_e = []
 				for e in stng.edge_priority[m][v]:
 					m_uses_e.append(stng.vars.used(m,e,i))
@@ -88,7 +89,7 @@ def generalSimulationConstraints(stng, s, M, t, l,
 		s.add(constr)
 
 def specificSimulationConstraints(stng, s, pr, M, t, l,
-	k_omissions=0,k_crashes=0,k_delays=0):
+	k_omissions=0,k_crashes=0,k_delays=0,RR='message'):
 	'''
 	Add simulation contraints specific to pr and not to k
 	'''
@@ -115,10 +116,22 @@ def specificSimulationConstraints(stng, s, pr, M, t, l,
 						if e2 == e: break
 						m_ej.append(stng.vars.used(m,e2,i))
 
+					# In Edge RR, a lower priority edge is used only if
+					# all higer priority edges have crashed
+					if RR == 'edge':
+						higher_e_crash = []
+						for e2 in stng.edge_priority[m][v]:
+							if e2 == e: break
+							higher_e_crash.append(stng.vars.crash(e2,i))
+						RR_condition = And(higher_e_crash)
+					else:
+						assert RR == 'message'
+						RR_condition = True
+
 					pos = stng.vars.config(m,v,i)
 					nocrash = Not(stng.vars.crash(e,i))
-					# Edge e is free according to priorities
-					free_edge = And(Not(Or(mj_e)),Not(Or(m_ej)))
+					# Edge e is free according to priorities, RR condition
+					free_edge = And(Not(Or(mj_e)),Not(Or(m_ej)),RR_condition)
 
 					lhs = And(pos,nocrash,free_edge)
 					s.add(Implies(lhs,stng.vars.used(m,e,i)))

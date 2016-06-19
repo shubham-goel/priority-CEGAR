@@ -252,6 +252,27 @@ def GeneratePriorities(stng, mdl, M):
 
 	return priorities
 
+def getEdgePriorities(g, FCv, UFSv, M):
+	'''
+	Return Edge Priority data from First and Second Path
+	Return first and second priority edges as:
+	edge_priority[m][v][0] and edge_priority[m][v][1]
+	'''
+	edge_priority = {}
+	for m in M:
+		edge_priority[m]= {}
+		for v in g.V:
+			edge_priority[m][v] = []
+		for v in FCv[m]:
+			edge = g(v,v.nextF(m))
+			if edge is not None:
+				edge_priority[m][v].append(edge)
+		for v in UFSv[m]:
+			edge = g(v,v.nextS(m))
+			if edge is not None:
+				edge_priority[m][v].append(edge)
+	return edge_priority
+
 # Ref : https://rosettacode.org/wiki/Decimal_floating_point_number_to_binary#Python
 def float_dec2bin(d, max_len = 25):
 	d = float(d)

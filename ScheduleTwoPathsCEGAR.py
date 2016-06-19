@@ -269,10 +269,11 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	return (lower_bound,upper_bound)
 
 def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
-	p_omissions=0,p_crashes=0,p_delays=0):
+	p_omissions=0,p_crashes=0,p_delays=0, RR='message'):
 	'''
 	Serves the same purpose as successProb
 	Returns the probability of pr failing, given the crash parameters
+	Implements a MessageRR Algorithm
 	'''
 	print 'RUNNING priorityScore'
 	assert l==len(M)
@@ -283,7 +284,7 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	print_time("Simulating network...")
 	defineSimulationVariables(stng, M, t, basic_names=False)
 	generalSimulationConstraints(stng,s, M, t, l, l_is_upperBound=False)
-	specificSimulationConstraints(stng, s, pr, M, t, l)
+	specificSimulationConstraints(stng, s, pr, M, t, l, RR=RR)
 
 	print_time("setting weight vars...")
 	weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,precision=precision,
@@ -688,35 +689,32 @@ def CEGAR(stng, M, t, l,
 		print 'NO valid model EXISTS'
 		return False
 
-	if countFaults:
-		pr = GeneratePriorities(stng, mdl, M)
-		print_message_priorities(stng,mdl,M)
-		print_time("\n\nCounting Sabeteur Strategies for Schedule now...")
-		start_time = time.time()
+	print_time("generating priorities...")
+	pr = GeneratePriorities(stng, mdl, M)
 
+	# if load_priority:
+	# 	pr = load_priority_from_file(stng, M, "priorities.curr")
+	# if save_priority:
+	# 	save_priority_to_file(stng, pr, "priorities.curr")
+
+	print_message_priorities(stng,mdl,M)
+
+	if countFaults:
+
+		print_time("\n\nCounting Sabeteur Strategies for Schedule now...")
 		num_faults = count_WFS(stng, pr, M, t, l,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+		print_time("Ended Counting Sabeteur Strategies...")
 
-		end_time = time.time()
-		count_time = end_time-start_time
 		print "Number of distinct stratergies = {}\n\n".format(str(num_faults))
-		print "Time taken = {}\n\n".format(str(count_time))
 		print "End Time", time.time()
+
 		return (num_faults,count_time)
 
 	elif probabalistic:
-		print_time("generating priorities...")
-		pr = GeneratePriorities(stng, mdl, M)
 
-		# if load_priority:
-		# 	pr = load_priority_from_file(stng, M, "priorities.curr")
-		# if save_priority:
-		# 	save_priority_to_file(stng, pr, "priorities.curr")
-
-		print_message_priorities(stng,mdl,M)
-
-		p_omissions=0.01
-		p_crashes=0.01
+		p_omissions=0.0
+		p_crashes=0.25
 		p_delays=0
 		precision=50
 
@@ -729,25 +727,32 @@ def CEGAR(stng, M, t, l,
 
 		timings = {}
 
-		# prob0 = successProb(stng, pr, M, t, l,optimize=True,naive=True,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		# prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		# timings[-1]=time.time()
-		# prob1 = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		# timings[0]=time.time()
-		# prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=0.01,confidence=0.999)
+		timings[-3]=time.time()
+		prob0o = successProb(stng, pr, M, t, l,optimize=True,naive=True,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		timings[-2]=time.time()
+		prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		timings[-1]=time.time()
+		prob1e = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
+					RR='edge')
+		timings[0]=time.time()
+		prob1m = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
+					RR='message')
+		timings[0.1]=time.time()
+		prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.01,confidence=0.999)
 		timings[1]=time.time()
 		prob2et = monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
 					p_omissions=p_omissions,p_crashes=p_crashes,
 					epsilon=0.01,confidence=0.999)
 		timings[2]=time.time()
-		# prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=0.01,confidence=0.999)
+		prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=0.01,confidence=0.999)
 		timings[3]=time.time()
 		prob2mt = monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
 					p_omissions=p_omissions,p_crashes=p_crashes,
@@ -758,21 +763,21 @@ def CEGAR(stng, M, t, l,
 		print ''
 		print '#Final Probabilities:'
 		print ''
-		# print 'successProb OPT              \t',prob0
-		# print 'successProb NO OPT           \t',prob0a
-		# print 'priorityScore                \t',prob1,timings[0]-timings[-1]
-		# print 'monte_carlo edgeRR           \t',prob2e,timings[1]-timings[0]
+		print 'successProb OPT              \t',prob0o,timings[-2]-timings[-3]
+		print 'successProb NO OPT           \t',prob0a,timings[-1]-timings[-2]
+		print 'priorityScore edgeRR         \t',prob1e,timings[0]-timings[-1]
+		print 'priorityScore messageRR      \t',prob1m,timings[0.1]-timings[0]
+		print 'monte_carlo edgeRR           \t',prob2e,timings[1]-timings[0.1]
 		print 'monte_carlo thread edgeRR    \t',prob2et,timings[2]-timings[1]
-		# print 'monte_carlo messageRR        \t',prob2m,timings[3]-timings[2]
+		print 'monte_carlo messageRR        \t',prob2m,timings[3]-timings[2]
 		print 'monte_carlo thread messageRR \t',prob2mt,timings[4]-timings[3]
 		print ''
 		print ''
 
-		prob = prob1
+		prob = prob1e
 
 		end_time = time.time()
 		count_time = end_time-start_time
-		# print "\nProbability Interval = {}\n\n".format(prob)
 		print "Total Time taken = {}\n\n".format(str(count_time))
 		print "End Time", time.time()
 		return (prob,count_time)
@@ -818,28 +823,6 @@ def CEGAR(stng, M, t, l,
 		if mdl is False:
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
-
-def getEdgePriorities(g, FCv, UFSv, M):
-	'''
-	Return Edge Priority data from First and Second Path
-	Return first and second priority edges as:
-	edge_priority[m][v][0] and edge_priority[m][v][1]
-	'''
-	edge_priority = {}
-	for m in M:
-		edge_priority[m]= {}
-		for v in g.V:
-			edge_priority[m][v] = []
-		for v in FCv[m]:
-			edge = g(v,v.nextF(m))
-			if edge is not None:
-				edge_priority[m][v].append(edge)
-		for v in UFSv[m]:
-			edge = g(v,v.nextS(m))
-			if edge is not None:
-				edge_priority[m][v].append(edge)
-	return edge_priority
-
 
 # EXTRAS
 def print_edges(stng):

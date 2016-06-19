@@ -58,6 +58,10 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 			with open(filename, 'r') as file:
 				(G, M) =  pickle.load(file)
 
+		assert len(M) == m
+		assert networkx.number_of_nodes(G) == n
+		assert networkx.number_of_edges(G) == e
+
 	else:
 		G = networkx.gnm_random_graph(n, e, directed=True)
 		M = []
