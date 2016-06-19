@@ -334,7 +334,7 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 def monte_carlo_Score(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge'):
-	print 'RUNNING monte_carlo_Score'
+	print_time('RUNNING monte_carlo_Score')
 
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
@@ -358,6 +358,7 @@ def monte_carlo_Score(stng, pr, M, t, l,
 		if sim_result:
 			successful_iter += 1
 
+	print_time('ENDED monte_carlo_Score')
 
 	return float(successful_iter)/float(num_iterations)
 
@@ -365,7 +366,7 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge',
 	num_threads = 5):
-	print 'RUNNING monte_carlo_Score_thread'
+	print_time('RUNNING monte_carlo_Score_thread')
 
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
@@ -412,6 +413,7 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	assert iter_count == num_iterations
 
 	print 'return_dict',return_dict
+	print_time('ENDED monte_carlo_Score_thread')
 	return float(successful_iter)/float(num_iterations)
 
 def rand_sim_EdgeRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
@@ -727,12 +729,12 @@ def CEGAR(stng, M, t, l,
 
 		timings = {}
 
-		timings[-3]=time.time()
-		prob0o = successProb(stng, pr, M, t, l,optimize=True,naive=True,
-					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		timings[-2]=time.time()
-		prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
-					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# timings[-3]=time.time()
+		# prob0o = successProb(stng, pr, M, t, l,optimize=True,naive=True,
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# timings[-2]=time.time()
+		# prob0a = successProb(stng, pr, M, t, l,optimize=False,naive=True,
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 		timings[-1]=time.time()
 		prob1e = priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
@@ -742,17 +744,17 @@ def CEGAR(stng, M, t, l,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='message')
 		timings[0.1]=time.time()
-		prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.01,confidence=0.999)
+		# prob2e = monte_carlo_Score(stng, pr, M, t, l,RR='edge',
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,
+		# 			epsilon=0.01,confidence=0.999)
 		timings[1]=time.time()
 		prob2et = monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
 					p_omissions=p_omissions,p_crashes=p_crashes,
 					epsilon=0.01,confidence=0.999)
 		timings[2]=time.time()
-		prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=0.01,confidence=0.999)
+		# prob2m = monte_carlo_Score(stng, pr, M, t, l,RR='message',
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,
+		# 			epsilon=0.01,confidence=0.999)
 		timings[3]=time.time()
 		prob2mt = monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
 					p_omissions=p_omissions,p_crashes=p_crashes,
@@ -763,13 +765,13 @@ def CEGAR(stng, M, t, l,
 		print ''
 		print '#Final Probabilities:'
 		print ''
-		print 'successProb OPT              \t',prob0o,timings[-2]-timings[-3]
-		print 'successProb NO OPT           \t',prob0a,timings[-1]-timings[-2]
+		# print 'successProb OPT              \t',prob0o,timings[-2]-timings[-3]
+		# print 'successProb NO OPT           \t',prob0a,timings[-1]-timings[-2]
 		print 'priorityScore edgeRR         \t',prob1e,timings[0]-timings[-1]
 		print 'priorityScore messageRR      \t',prob1m,timings[0.1]-timings[0]
-		print 'monte_carlo edgeRR           \t',prob2e,timings[1]-timings[0.1]
+		# print 'monte_carlo edgeRR           \t',prob2e,timings[1]-timings[0.1]
 		print 'monte_carlo thread edgeRR    \t',prob2et,timings[2]-timings[1]
-		print 'monte_carlo messageRR        \t',prob2m,timings[3]-timings[2]
+		# print 'monte_carlo messageRR        \t',prob2m,timings[3]-timings[2]
 		print 'monte_carlo thread messageRR \t',prob2mt,timings[4]-timings[3]
 		print ''
 		print ''
@@ -823,15 +825,6 @@ def CEGAR(stng, M, t, l,
 		if mdl is False:
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
-
-# EXTRAS
-def print_edges(stng):
-	print ''
-	print ''
-	for i in range(len(stng.g.E)):
-		print 'edge',i, str(stng.g.E[i])
-	print ''
-	print ''
 
 def main(n, m, e, t, l,
 	k_omissions=0, k_crashes=0, k_delays=0,

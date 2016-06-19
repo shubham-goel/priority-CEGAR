@@ -315,6 +315,14 @@ def reduce_precision(p,precision):
 # PRINTING
 ##########
 
+def print_edges(stng):
+	print ''
+	print ''
+	for i in range(len(stng.g.E)):
+		print 'edge',i, str(stng.g.E[i])
+	print ''
+	print ''
+
 def print_priorities(stng,M):
 	'''
 	print edge priorities
