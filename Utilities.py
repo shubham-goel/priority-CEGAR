@@ -106,7 +106,7 @@ def crashesProbability(stng,M,t,crashed=0,
 # MISC
 ######
 
-def save_scaling_data_to_file(params,prob,rt,filename=None):
+def save_scaling_data_to_file(params,prob,filename=None):
 
 	n=params['n']
 	m=params['m']
@@ -117,9 +117,7 @@ def save_scaling_data_to_file(params,prob,rt,filename=None):
 	if filename is None:
 		filename = 'results/n{}-m{}-e{}-t{}-l{}.dat'.format(n,m,e,t,l)
 
-	file = open(filename, 'w')
-	pickle.dump((params,prob,rt), file)
-	file.close()
+	save_to_file((params,prob),filename)
 
 def save_counting_parameters(n,m,e,t,k,l,result):
 	parameter_file = "timings_counting_bitadder.txt"

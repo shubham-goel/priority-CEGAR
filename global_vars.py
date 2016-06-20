@@ -14,18 +14,3 @@ def init():
 	hex2bin = dict('{:x} {:04b}'.format(x,x).split() for x in range(16))
 	bin2hex = dict('{:b} {:x}'.format(x,x).split() for x in range(16))
 	float_dec2bin_dict = {}
-
-def init_successProb():
-	global successProb_iter_start_time
-	global successProb_iter_end_time
-	global successProb_iter_run_time
-	successProb_iter_run_time = {}
-	successProb_iter_end_time = {}
-	successProb_iter_start_time = {}
-
-def process_successProb():
-	for key in successProb_iter_start_time.keys():
-		tt = successProb_iter_end_time[key][0]-successProb_iter_start_time[key]
-		prob = successProb_iter_end_time[key][1]
-		successProb_iter_run_time[key] = (tt,prob)
-	return successProb_iter_run_time
