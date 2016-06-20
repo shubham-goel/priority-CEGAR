@@ -167,7 +167,6 @@ def Adverserial(stng, pr, M, t, l,
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
 
-@profile
 def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
@@ -355,7 +354,6 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	print ''
 	return (lower_bound,upper_bound)
 
-@profile
 def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0, RR='message'):
 	'''
@@ -426,7 +424,6 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	print_time('RETURNING priorityScore...')
 	return +prob
 
-@profile
 def monte_carlo_Score(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge'):
@@ -467,7 +464,6 @@ def monte_carlo_Score(stng, pr, M, t, l,
 
 	return float(successful_iter)/float(num_iterations)
 
-@profile
 def monte_carlo_Score_thread(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge',
@@ -529,7 +525,6 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	else:
 		return float(successful_iter)/float(iter_count)
 
-@profile
 def rand_sim_EdgeRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
 	successful_iter = 0
@@ -550,7 +545,6 @@ def rand_sim_EdgeRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout,
 	output_dict[id_thread] = final_res
 	return final_res
 
-@profile
 def rand_sim_MessageRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
 	successful_iter = 0
@@ -571,7 +565,6 @@ def rand_sim_MessageRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeo
 	output_dict[id_thread] = final_res
 	return final_res
 
-@profile
 def rand_sim_EdgeRR(stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
 
@@ -662,7 +655,6 @@ def rand_sim_EdgeRR(stng, pr, M, timeout, l,
 						sim_vars.queue[next_edge].append(m)
 	return (len(msg_arrived) >= l)
 
-@profile
 def rand_sim_MessageRR(stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
 
@@ -720,7 +712,6 @@ def rand_sim_MessageRR(stng, pr, M, timeout, l,
 
 	return (len(msg_arrived) >= l)
 
-@profile
 def saboteurProbability(stng,s,pr,M,t,l,
 	k_omissions=0,k_crashes=0,k_delays=0,
 	p_omissions=0,p_crashes=0,p_delays=0,
@@ -768,7 +759,6 @@ def saboteurProbability(stng,s,pr,M,t,l,
 	print "saboteurProbability Iteration Count = {}".format(count)
 	return prob
 
-@profile
 def get_doomed_state(stng, crash_model, pr, M, t, l,
 	k_omissions=0,k_crashes=0,k_delays=0):
 	'''
@@ -798,7 +788,6 @@ def get_doomed_state(stng, crash_model, pr, M, t, l,
 
 	return doomed
 
-@profile
 def CEGAR(stng, M, t, l,
 	k_omissions=0, k_crashes=0, k_delays=0,
 	optimize=False, showProgress=False, countFaults=False,
@@ -985,7 +974,6 @@ def CEGAR(stng, M, t, l,
 					k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays,
 					optimize=optimize, showProgress=showProgress)
 
-@profile
 def main(n, m, e, t, l,
 	k_omissions=0, k_crashes=0, k_delays=0,
 	filename=None, save=False, load=False, custom=False,
