@@ -755,7 +755,19 @@ def wieghted_to_unweighted(stng,s,weight_vars,t,
 
 	return denom
 
-def run_bash(cmd):
-	if subprocess.call([cmd],shell=True) == 1 :
-		print("Exit Status error!")
-		raise
+def run_bash(cmd,timeout=None):
+	if timeout is None:
+		if subprocess.call([cmd],shell=True) == 1 :
+			print("Exit Status error!")
+			return 'error'
+		else:
+			return 'success'
+	else:
+		temp_cmd_file = 'temp_cmd_file.txt'
+		temp_status = 'temp_status.txt'
+		save_to_file(cmd,temp_cmd_file)
+
+		cmd='python3 run_cmd_py3.py {} {} {}'.format(temp_cmd_file,temp_status,timeout)
+		run_bash(cmd)
+
+		return load_from_file(temp_status)

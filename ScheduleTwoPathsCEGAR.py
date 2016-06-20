@@ -246,48 +246,71 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				# Run sharpSAT on file
 				print_time("#################running sharpSAT on file...")
 				cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
-				run_bash(cmd)
+				bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
 				time_3=time.time()-start1
+				print 'sharpSAT',bash_output
+				sharpSAT_timeout=False
+				if bash_output=='timeout':
+					sharpSAT_timeout=True
+					run_bash('./kill_sharpsat.sh')
+					numSols_sharpSAT='Timeout'
+				elif bash_output!='success':
+					raise
+				else:
+					rt2['processing sharpSAT']=time.time()
+					# Process sharpSat output to get #Sols
+					print_time("################reading sharpSat's output...")
+					numSols_sharpSAT = process_sharpSat_output(sol_file)
+					print "num_sols={}".format(numSols_sharpSAT)
 
-				rt2['processing sharpSAT']=time.time()
-				# Process sharpSat output to get #Sols
-				print_time("################reading sharpSat's output...")
-				numSols_sharpSAT = process_sharpSat_output(sol_file)
-				print "num_sols={}".format(numSols_sharpSAT)
-				numSols=numSols_sharpSAT
-
-				if time_3 > 300:
+				if True:
 					rt2['running mis']=time.time()
 					# approxMC, cryptominsat take too long to run
 					start1=time.time()
 					# Run approxMC on file
 					print_time("##################running MIS on file...")
 					cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
-					run_bash(cmd)
-					with open("mis.out", "r") as f_temp:
-						c_ind = f_temp.read()
-						c_ind = "c ind {}".format(c_ind[2:])
-					with open("mis.out", "w") as f_temp:
-						f_temp.write(c_ind)
-					cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
-					run_bash(cmd)
+					bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
+					print 'mis',bash_output
+					mis_timeout=False
+					if bash_output=='timeout':
+						mis_timeout=True
+						run_bash('./kill_mis.sh')
+					elif bash_output!='success':
+						raise
+					else:
+						with open("mis.out", "r") as f_temp:
+							c_ind = f_temp.read()
+							c_ind = "c ind {}".format(c_ind[2:])
+						with open("mis.out", "w") as f_temp:
+							f_temp.write(c_ind)
+						cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',cnf_file)
+						run_bash(cmd)
 					time_1=time.time()-start1
 
 					rt2['running approxmc']=time.time()
 					start1=time.time()
 					print_time("##################running approxMC on file...")
 					cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(cnf_file, sol_file)
-					run_bash(cmd)
+					bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
 					time_2=time.time()-start1
+					print 'approxMC',bash_output
+					approxMC_timeout=False
+					if bash_output=='timeout':
+						approxMC_timeout=True
+						run_bash('./kill_approxMC.sh')
+						numSols_approxMC='Timeout'
+					elif bash_output!='success':
+						raise
+					else:
+						rt2['processing approxmc']=time.time()
+						# Process sharpSat output to get #Sols
+						print_time("################reading approxMC's output...")
+						numSols_approxMC = process_approxMC_output(sol_file)
+						print "num_sols={}".format(numSols_approxMC)
 
-
-					rt2['processing approxmc']=time.time()
-					# Process sharpSat output to get #Sols
-					print_time("################reading approxMC's output...")
-					numSols_approxMC = process_approxMC_output(sol_file)
-					print "num_sols={}".format(numSols_approxMC)
-
-					assert ((numSols_sharpSAT-numSols_approxMC)/numSols_sharpSAT)**2 < 0.1
+						if not sharpSAT_timeout:
+							assert ((numSols_sharpSAT-numSols_approxMC)/numSols_sharpSAT)**2 < 0.1
 
 					timing_result = '{}+{}/{}\t={}'.format(time_1, time_2, time_3, ((time_1+time_2)*1.0/time_3))
 					if time_3 > 300:
@@ -295,8 +318,15 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 					if (time_2)*1.0/time_3 < 1:
 						timing_result += "\tAPPROXIMATION ROCKS"
-
+					if sharpSAT_timeout:
+						timing_result += ' sharpSAT_timeout'
+					if mis_timeout:
+						timing_result += ' mis_timeout'
+					if approxMC_timeout:
+						timing_result += 'approxMC_timeout'
 				else:
+					mis_timeout=None
+					approxMC_timeout=None
 					timing_result = '#sat is too quick... {}'.format(time_3)
 
 				rt2['saving parameters']=time.time()
@@ -428,7 +458,7 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	# Run SharpSat on file
 	print_time("running SharpSat on file...")
 	rt['running sharpsat']=time.time()
-	cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
+	cmd = "./sharpSAT -t 500 {} > {}".format(cnf_file, sol_file)
 	if subprocess.call([cmd],shell=True) == 1 :
 		print("Exit Status error!")
 	else:
