@@ -59,7 +59,7 @@ def generalSimulationConstraints(stng, s, M, t, l,
 
 		#require that if an edge fails, it fails at time 0
 		if immediatefailure is not None:
-			s.add(Implies(stng.vars.crash(e, t-1), 
+			s.add(Implies(stng.vars.crash(e, t-1),
 							And(stng.vars.crash(e, immediatefailure),
 								Not(stng.vars.crash(e, immediatefailure-1)))))
 
@@ -452,4 +452,4 @@ def higher_priority_using(stng,s,pr,M,e,t,m,v):
 			if e in stng.edge_priority[m2][v]:# m2 may want to travel on e
 				constr = And(stng.vars.used(m2,e,t),pr[m2][v]<pr[m][v])
 				there_exists.append(constr)
- 	return Or(there_exists)
+	return Or(there_exists)

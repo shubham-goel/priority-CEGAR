@@ -115,7 +115,7 @@ def save_scaling_data_to_file(params,prob,rt,filename=None):
 	l=params['l']
 
 	if filename is None:
-		filename = 'results/n{}_m{}_e{}_t{}_l{}.dat'.format(n,m,e,t,l)
+		filename = 'results/n{}-m{}-e{}-t{}-l{}.dat'.format(n,m,e,t,l)
 
 	file = open(filename, 'w')
 	pickle.dump((params,prob,rt), file)
@@ -342,6 +342,21 @@ def reduce_precision(p,precision):
 ##########
 # PRINTING
 ##########
+
+def print_dict(d,prefix=''):
+	try:
+		for key in d.keys():
+			print prefix+str(key),'=> ('
+			print_dict(d[key],prefix=prefix+'\t')
+			print prefix+')'
+	except AttributeError:
+		try:
+			for i,val in enumerate(d):
+				print prefix+str(i),'=> ('
+				print_dict(val,prefix=prefix+'\t')
+				print prefix+')'
+		except TypeError:
+			print prefix+str(d)
 
 def print_edges(stng):
 	print ''

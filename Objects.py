@@ -160,8 +160,8 @@ class Vertex:
 	def nextF(self,m):
 		if m in self.__nextF:
 		   return self.__nextF[m]
-       # if (m,self) in FC:
-       #     return FC[(m,self)]
+		# if (m,self) in FC:
+		#     return FC[(m,self)]
 
 	def setNextF(self, m, u):
 		self.__nextF[m] = u
