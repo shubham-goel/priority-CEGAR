@@ -271,7 +271,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				# Process and save Formula to file
 				glbl_vars.init()
 				cnf_file = "umc_dimacs{}_{}_{}_{}_{}_{}_{}.txt".format(n,m,e,t,k_crashes,l,fail_at)
-				sol_file = "num_sols.txt"
+				sol_file = "umc_dimacs{}_{}_{}_{}_{}_{}_{}.txt.sol".format(n,m,e,t,k_crashes,l,fail_at)
 				mis_cnf_file = cnf_file+'.ind'
 				# tact = Tactic('tseitin-cnf')
 				tact = With('tseitin-cnf',distributivity=False)
