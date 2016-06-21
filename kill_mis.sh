@@ -1,3 +1,4 @@
+#!/bin/bash
 while [[ 1 -eq 1 ]]; do
 	flag=1
 	for pid in $(ps -ef | grep "MIS\.py" | awk '{print $2}'); do

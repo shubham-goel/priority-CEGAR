@@ -874,6 +874,8 @@ def run_approxMC(cnf_file,mis=False):
 		print "reading approxMC's output..."
 		numSols = process_approxMC_output(approxMC_output)
 		if numSols=='error':
+			run_bash('mkdir segmentation_faults')
+			run_bash('cp {} segmentation_faults/{}'.format(approxMC_input,approxMC_input))
 			return 'error','error'
 		else:
 			return numSols,run_time
