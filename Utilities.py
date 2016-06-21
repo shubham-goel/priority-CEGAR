@@ -655,7 +655,10 @@ def process_approxMC_output(sol_file):
 				num3 = int(expr[1].split('^')[1])
 				numSols = num1*(num2**num3)
 
-		assert numSols is not None
+		if numSols is None:
+			sys.stderr.write('\n\n'+f.read()+'\n\n')
+			return 'error'
+
 	return numSols
 
 def process_sharpSat_output(sol_file,return_time=False):
@@ -818,9 +821,10 @@ def run_mis(cnf_file,output_cnf_file):
 		print 'Timeout'
 		run_bash('./kill_mis.sh')
 		return 'timeout','timeout'
-	elif bash_output!='success':
-		raise
+	elif bash_output=='error':
+		return 'error','error'
 	else:
+		assert bash_output=='success'
 		with open("mis.out", "r") as f_temp:
 			c_ind = f_temp.read()
 			c_ind = "c ind {}".format(c_ind[2:])
@@ -864,13 +868,15 @@ def run_approxMC(cnf_file,mis=False):
 		print 'Timeout'
 		run_bash('./kill_approxMC.sh')
 		return 'timeout','timeout'
-	elif bash_output!='success':
-		raise
+	# The exit codes returned by approxMC do not follow common convention
 	else:
-		# Process approxMC output to get #Sols
+		# Process approxMC output to get #Sols/check for error
 		print "reading approxMC's output..."
 		numSols = process_approxMC_output(approxMC_output)
-		return numSols,run_time
+		if numSols=='error':
+			return 'error','error'
+		else:
+			return numSols,run_time
 
 
 def run_sharpSAT(cnf_file,sol_file,return_time=False):
@@ -892,9 +898,13 @@ def run_sharpSAT(cnf_file,sol_file,return_time=False):
 			return 'timeout','timeout'
 		else:
 			return 'timeout'
-	elif bash_output!='success':
-		raise
+	elif bash_output=='error':
+		if return_time:
+			return 'error','error'
+		else:
+			return 'error'
 	else:
+		assert bash_output=='success'
 		# Process sharpSat output to get #Sols
 		print "reading SharpSat's output..."
 		numSols = process_sharpSat_output(sol_file,return_time=return_time)

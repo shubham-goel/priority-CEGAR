@@ -307,9 +307,9 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				# -----------------------------------------------
 
 				# Compare sharpSAT and approxMC results
-				if sharpSAT_time!='timeout' and approxMC_mis_time!='timeout':
+				if isinstance(sharpSAT_time,float) and isinstance(approxMC_mis_time,float):
 					diff=numSols_sharpSAT-numSols_approxMC_mis
-					b1=(numSols_sharpSAT==0)
+					b1=(numSols_sharpSAT==0) and (numSols_approxMC==0)
 					if not (b1 or ((float(diff)/(numSols_sharpSAT))**2 < 0.1)):
 						sys.stderr.write('Comparison Errors between counting approaches! => '+
 											'FILE: ' + cnf_file + ' counts=' +
@@ -317,9 +317,9 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 						print('Comparison Errors between counting approaches! => '+
 											'FILE: ' + cnf_file + ' counts=' +
 											str((numSols_sharpSAT,numSols_approxMC_mis))+'\n\n')
-				if sharpSAT_time!='timeout' and approxMC_time!='timeout':
+				if isinstance(sharpSAT_time,float) and isinstance(approxMC_time,float):
 					diff=numSols_sharpSAT-numSols_approxMC
-					b1=(numSols_sharpSAT==0)
+					b1=(numSols_sharpSAT==0) and (numSols_approxMC==0)
 					if not (b1 or ((float(diff)/(numSols_sharpSAT))**2 < 0.1)):
 						sys.stderr.write('Comparison Errors between counting approaches! => '+
 											'FILE: ' + cnf_file + ' counts=' +
@@ -343,7 +343,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				numSols = numSols_sharpSAT
 
 				# Calculate Probabilities
-				if numSols != 'timeout':
+				if isinstance(numSols,int) or isinstance(numSols,long):
 
 					lb=numSols*((1-p_crashes)**(t*(len(stng.g.E)-k_crashes)+fail_at*k_crashes))*(p_crashes**k_crashes)
 					ub=lb
@@ -363,12 +363,21 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 					print (lower_bound,upper_bound)
 
-				else:
+				elif numSols == 'timeout':
 					print_time('successProb Timeout...')
 					print '###############################################'
 					print '###############################################'
 					print ''
 					return ((lower_bound,upper_bound),'Timeout')
+				elif numSols == 'error':
+					print_time('successProb error...')
+					print '###############################################'
+					print '###############################################'
+					print ''
+					return ((lower_bound,upper_bound),'error')
+				else:
+					print numSols,type(numSols)
+					raise
 
 				if k_crashes==0:
 					break
@@ -441,12 +450,14 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	# Run SharpSat on file
 	print_time("running SharpSat on file...")
 	numSols,sharpSAT_time = run_sharpSAT(cnf_file,sol_file,return_time=True)
-	if numSols == 'timeout':
+	if not (isinstance(numSols,int) or isinstance(numSols,long)):
 		print "\n\n"
+		print "numSols is not integral"
+		print "Type =",type(numSols)
 		print "sharpSAT_time = {}".format(sharpSAT_time)
 		print "numSols = {}".format(numSols)
 		print "\n"
-		prob = 'timeout'
+		prob = numSols
 	else:
 		denom = Decimal(normalization_factor)*Decimal(denom)
 		prob = Decimal(numSols)/denom
@@ -531,7 +542,7 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	print_time('RUNNING monte_carlo_Score_thread...')
 	print ''
 	print 'epsilon={}\nconfidence={}\nRR={}'.format(epsilon,confidence,RR)
-	print 'p_omissions={}\n,p_crashes={}\n'.format(p_omissions,p_crashes)
+	print 'p_omissions={}\np_crashes={}\n'.format(p_omissions,p_crashes)
 	print ''
 
 	assert epsilon>0 and epsilon<1
