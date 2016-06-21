@@ -310,11 +310,21 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				if sharpSAT_time!='timeout' and approxMC_mis_time!='timeout':
 					diff=numSols_sharpSAT-numSols_approxMC_mis
 					b1=(numSols_sharpSAT==0)
-					assert b1 or ((float(diff)/(numSols_sharpSAT))**2 < 0.1)
+					if not (b1 or ((float(diff)/(numSols_sharpSAT))**2 < 0.1)):
+						sys.stderr.write('Comparison Errors between counting approaches! => '+
+											'FILE: ' + cnf_file + ' counts='
+											str((numSols_sharpSAT,numSols_approxMC_mis))+'\n\n')
+						while True:
+							pass
 				if sharpSAT_time!='timeout' and approxMC_time!='timeout':
 					diff=numSols_sharpSAT-numSols_approxMC
 					b1=(numSols_sharpSAT==0)
-					assert b1 or ((float(diff)/(numSols_sharpSAT))**2 < 0.1)
+					if not (b1 or ((float(diff)/(numSols_sharpSAT))**2 < 0.1)):
+						sys.stderr.write('Comparison Errors between counting approaches! => '+
+											'FILE: ' + cnf_file + ' counts='
+											str((numSols_sharpSAT,numSols_approxMC))+'\n\n')
+						while True:
+							pass
 
 				# Print Different Results
 				print ''

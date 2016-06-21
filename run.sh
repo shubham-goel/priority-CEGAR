@@ -9,10 +9,13 @@ rm -rf results
 mv new_results results
 
 k=0
-for nodes in `seq 3 50`;
+for nodes in `seq 4 50`;
 do
-	start_edges=$((2*$nodes))
-	end_edges=$((2*$nodes))
+	start_edges1=$((5*$nodes/2))
+	end_edges1=$((5*$nodes/2))
+	start_edges=${start_edges1%.*}
+	end_edges=${end_edges1%.*}
+
 	for edges in `seq $start_edges $end_edges`;
 	do
 		start_messages=$(($nodes))
