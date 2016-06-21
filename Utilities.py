@@ -474,10 +474,13 @@ def printCounterexample(stng, mdl, t, M,count=False):
 	if count is True:
 		return (k_omissions,k_crashes,k_delays)
 
-def print_time(msg):
+def print_time(msg,update=True):
 	new_time = time.time()
-	print msg,new_time,new_time-glbl_vars.last_time
-	glbl_vars.last_time = new_time
+	if update:
+		print msg,new_time,new_time-glbl_vars.last_time
+		glbl_vars.last_time = new_time
+	else:
+		print msg,new_time
 
 #############
 # DEFINE VARS
@@ -612,7 +615,10 @@ def save_DIMACS_to_file(dimacs, filename):
 		f.write(header)
 		for clause in dimacs:
 			f.write(format_DIMACS_clause(clause))
-	print "num_vars,num_clauses=",num_vars,num_clauses
+	print ''
+	print "num_vars =",num_vars
+	print "num_clauses =",num_clauses
+	print ''
 
 def format_DIMACS_clause(clause):
 	formatted = " ".join([str(lit) for lit in clause])
@@ -652,8 +658,9 @@ def process_approxMC_output(sol_file):
 		assert numSols is not None
 	return numSols
 
-def process_sharpSat_output(sol_file):
+def process_sharpSat_output(sol_file,return_time=False):
 	numSols = None
+	time_taken=None
 	with open(sol_file, "r") as f:
 		status = 0
 		for line in f:
@@ -666,15 +673,26 @@ def process_sharpSat_output(sol_file):
 			elif status == 2:
 				assert line=="# END\n"
 				status += 1
+			elif status == 3:
+				assert line =="\n"
+				status+=1
+			elif status == 4:
+				assert line[:6]=="time: "
+				time_taken=float(line[6:-2])
+				status+=1
 			else:
 				break
-		assert (status==3)
+		assert (status==5)
 		assert numSols is not None
-	return numSols
+		assert time_taken is not None
+
+	if return_time:
+		return numSols,time_taken
+	else:
+		return numSols
 
 def set_weight_vars(stng, s, M, t,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0):
-	print p_omissions,p_crashes,p_delays
 	normalization_factor = 1
 	weight_vars = []
 	p_omissions1 = reduce_precision(p_omissions,precision)
@@ -753,7 +771,122 @@ def wieghted_to_unweighted(stng,s,weight_vars,t,
 
 	return denom
 
-def run_bash(cmd):
-	if subprocess.call([cmd],shell=True) == 1 :
-		print("Exit Status error!")
+def run_bash(cmd,timeout=None):
+	if timeout is None:
+		if subprocess.call([cmd],shell=True) == 1 :
+			print("Exit Status error!")
+			return 'error'
+		else:
+			return 'success'
+	else:
+		temp_cmd_file = 'temp_cmd_file.txt'
+		temp_status = 'temp_status.txt'
+		save_to_file(cmd,temp_cmd_file)
+
+		cmd='python3 run_cmd_py3.py {} {} {}'.format(temp_cmd_file,temp_status,timeout)
+		run_bash(cmd)
+
+		return load_from_file(temp_status)
+
+def run_mis(cnf_file,output_cnf_file):
+	'''
+	Find MIS of cnf_file and save to output_cnf_file
+	:return : 'timeout', 'success'
+	'''
+
+	start_t = time.time()
+
+	# Run MIS on file
+	cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
+	bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
+	print 'mis',bash_output
+
+	end_t=time.time()
+	run_time=end_t-start_t
+
+	# Check output status
+	if bash_output=='timeout':
+		print 'Timeout'
+		run_bash('./kill_mis.sh')
+		return 'timeout','timeout'
+	elif bash_output!='success':
 		raise
+	else:
+		with open("mis.out", "r") as f_temp:
+			c_ind = f_temp.read()
+			c_ind = "c ind {}".format(c_ind[2:])
+		with open("mis.out", "w") as f_temp:
+			f_temp.write(c_ind)
+		cmd = "cat {} >> {} && mv {} {}".format(cnf_file,'mis.out','mis.out',output_cnf_file)
+		run_bash(cmd)
+		return 'success',run_time
+
+def run_approxMC(cnf_file,mis=False):
+	'''
+	Run cryptominsat (./scalmc) on cnf_file
+	:param mis: preprocess cnf_file to find MIS
+	:return : 'timeout', approximate number of SAT assignments
+	'''
+
+	# run MIS on file
+	if mis:
+		cnf_file_ind=cnf_file+'.ind'
+		return_status,mis_time = run_mis(cnf_file,cnf_file_ind)
+		if return_status == 'timeout':
+			return 'timeout'
+		else:
+			assert return_status=='success'
+			approxMC_input = cnf_file_ind
+	else:
+		approxMC_input = cnf_file
+
+
+	start_t = time.time()
+	approxMC_output=approxMC_input+'.sol.approx'
+	# run approxMC on file
+	cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(approxMC_input, approxMC_output)
+	bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
+	print 'approxMC',bash_output
+	end_t=time.time()
+	run_time=end_t-start_t
+
+	# Check output status
+	if bash_output=='timeout':
+		print 'Timeout'
+		run_bash('./kill_approxMC.sh')
+		return 'timeout','timeout'
+	elif bash_output!='success':
+		raise
+	else:
+		# Process approxMC output to get #Sols
+		print "reading approxMC's output..."
+		numSols = process_approxMC_output(approxMC_output)
+		return numSols,run_time
+
+
+def run_sharpSAT(cnf_file,sol_file,return_time=False):
+	'''
+	Run sharpSAT on cnf_file, save output to sol_file
+	:return : 'timeout', exact number of SAT assignments
+	'''
+
+	# Run SharpSat on file
+	cmd = "./sharpSAT {} > {}".format(cnf_file, sol_file)
+	bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
+	print 'sharpSAT',bash_output
+
+	# Check output status
+	if bash_output=='timeout':
+		print 'Timeout'
+		run_bash('./kill_sharpsat.sh')
+		if return_time:
+			return 'timeout','timeout'
+		else:
+			return 'timeout'
+	elif bash_output!='success':
+		raise
+	else:
+		# Process sharpSat output to get #Sols
+		print "reading SharpSat's output..."
+		numSols = process_sharpSat_output(sol_file,return_time=return_time)
+		return numSols

@@ -7,7 +7,7 @@ def init():
 	global float_dec2bin_dict
 	global timeout_limit
 	global timeout_limit_small
-	timeout_limit = 300
+	timeout_limit = 2400
 	timeout_limit_small = 120
 	variable_number = 1
 	variable_name_to_number = {}
