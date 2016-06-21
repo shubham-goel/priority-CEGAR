@@ -50,6 +50,8 @@ do
 						rm -r "$directory"
 						cd ..
 					fi
+					echo 'Sleeping for 5 seconds...'
+					sleep 5
 				done
 			done
 		done
