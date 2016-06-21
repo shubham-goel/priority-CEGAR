@@ -150,7 +150,7 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 		except NetworkXNoPath:
 			print "NO PATH"
 			sys.stderr.write("NO PATH\n")
-			os._exit(1)
+			os._exit(2)
 
 		for v in p[1:]:
 			nextV = V[v]

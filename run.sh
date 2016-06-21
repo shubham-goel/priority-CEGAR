@@ -24,11 +24,11 @@ do
 		do
 			start_timeout=$(($nodes))
 			end_timeout=$(($nodes))
-			for timeout in `seq $end_timeout -1 $start_timeout`;
+			for timeout in `seq $start_timeout $end_timeout`;
 			do
 				l=$(($messages))
 				status=1
-				while [  $status -ne 0 ]; do
+				while [[  $status -ne 0 ]]; do
 					directory="n$nodes-m$messages-e$edges-t$timeout-l$l"
 					echo ''
 					echo ''
@@ -40,7 +40,7 @@ do
 					python ScheduleTwoPathsCEGAR.py $nodes $messages $edges $timeout $l $k -p >output.curr
 					status=$?
 					echo "Exit Status=$status"
-					if [ $status -eq 0 ]; then
+					if [[ $status -eq 0 ]]; then
 						mkdir results/$directory
 						cp settings.curr "results/$directory/$directory.setting"
 						cp output.curr "results/$directory/$directory.output"
@@ -49,9 +49,11 @@ do
 						zip "$directory" "$directory/$directory.setting" "$directory/$directory.output" "$directory/$directory.dat"
 						rm -r "$directory"
 						cd ..
+					elif [[ $status -ne 2 ]]; then
+						exit
 					fi
-					echo 'Sleeping for 5 seconds...'
-					sleep 5
+					echo 'Sleeping for 2 seconds...'
+					sleep 2
 				done
 			done
 		done
