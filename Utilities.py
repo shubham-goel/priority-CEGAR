@@ -771,10 +771,19 @@ def wieghted_to_unweighted(stng,s,weight_vars,t,
 
 	return denom
 
+def vaildate_exit_code(exit_code):
+	acceptable=[0,10,20]
+	if exit_code in acceptable:
+		return True
+	else:
+		return False
+
 def run_bash(cmd,timeout=None):
+	print('cmd >>>',cmd)
 	if timeout is None:
-		if subprocess.call([cmd],shell=True) == 1 :
-			print("Exit Status error!")
+		exit_code = subprocess.call([cmd],shell=True)
+		if not vaildate_exit_code(exit_code) :
+			print("Exit Status error! status={}\nError cmd={}".format(exit_code,cmd))
 			return 'error'
 		else:
 			return 'success'
