@@ -844,7 +844,7 @@ def run_approxMC(cnf_file,mis=False):
 	start_t = time.time()
 	approxMC_output=approxMC_input+'.sol.approx'
 	# run approxMC on file
-	cmd = "./scalmc --pivotAC 71 --tApproxMC 3 {} > {}".format(approxMC_input, approxMC_output)
+	cmd = "./scalmc {} > {}".format(approxMC_input, approxMC_output)
 	bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
 	print 'approxMC',bash_output
 	end_t=time.time()
