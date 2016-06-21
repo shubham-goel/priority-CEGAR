@@ -1,3 +1,4 @@
+import sys
 import networkx
 from networkx import NetworkXNoPath
 import random
@@ -148,6 +149,7 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 				p = networkx.shortest_path(G, source=s, target=t, weight='weight')
 		except NetworkXNoPath:
 			print "NO PATH"
+			sys.stderr.write("NO PATH\n")
 			os._exit(1)
 
 		for v in p[1:]:
