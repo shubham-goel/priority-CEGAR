@@ -266,7 +266,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 				#require that if an edge fails, it fails at time immediatefailure
 				print 'Adding immediatefailureConstraints...',time.time()
-				immediatefailureConstraints(stng, s, t,	fail_at):
+				immediatefailureConstraints(stng, s, t, fail_at)
 
 				# Process and save Formula to file
 				glbl_vars.init()
