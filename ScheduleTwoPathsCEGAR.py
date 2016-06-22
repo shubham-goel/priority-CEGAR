@@ -184,10 +184,31 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	else:
 		s = myGoal()
 
+	st_time=time.time()
+	rt_dat = {}
+	rt_dat['timing_time'] = 0
+	rt_dat['k_maxSimulationConstraints_BOOL'] = {}
+	rt_dat['immediatefailureConstraints'] = {}
+	rt_dat['saboteurProbability'] = {}
+	rt_dat['numSols_sharpSAT'] = {}
+	rt_dat['numSols_approxMC'] = {}
+	rt_dat['numSols_approxMC_mis'] = {}
+	rt_dat['sharpSAT_time'] = {}
+	rt_dat['approxMC_time'] = {}
+	rt_dat['mis_time'] = {}
+	rt_dat['approxMC_mis_time'] = {}
+	rt_dat['approxMC'] = {}
+	rt_dat['z3 to cnf'] = {}
+	rt_dat['cnf to dimacs'] = {}
+	rt_dat['timing_time'] += time.time() - st_time
+
+
 	print 'Adding constraints...',time.time()
+	st_time=time.time()
 	defineSimulationVariables(stng, M, t)
 	generalSimulationConstraints(stng,s, M, t, l)
 	specificSimulationConstraints(stng, s, pr, M, t, l)
+	rt_dat['generate program'] = time.time() - st_time
 
 	lower_bound=0
 	upper_bound=1
@@ -217,18 +238,37 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 		# create backtracking point for successive values of k
 		s.push()
 
+		st_time=time.time()
+		rt_dat['immediatefailureConstraints'][k_crashes] = {}
+		rt_dat['numSols_sharpSAT'][k_crashes] = {}
+		rt_dat['numSols_approxMC'][k_crashes] = {}
+		rt_dat['numSols_approxMC_mis'][k_crashes] = {}
+		rt_dat['sharpSAT_time'][k_crashes] = {}
+		rt_dat['approxMC_time'][k_crashes] = {}
+		rt_dat['mis_time'][k_crashes] = {}
+		rt_dat['approxMC_mis_time'][k_crashes] = {}
+		rt_dat['approxMC'][k_crashes] = {}
+		rt_dat['z3 to cnf'][k_crashes] = {}
+		rt_dat['cnf to dimacs'][k_crashes] = {}
+		rt_dat['timing_time'] += time.time() - st_time
+
 		start_time = time.time()
 
 		if naive:
 
 			print 'Adding k_maxSimulationConstraints...',time.time()
+			st_time=time.time()
 			k_maxSimulationConstraints(stng,s, t, exact=True,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+			rt_dat['k_maxSimulationConstraints_BOOL'][k_crashes] = time.time() - st_time
+
 
 			print 'Finding saboteurProbability...',time.time()
+			st_time=time.time()
 			p1 = saboteurProbability(stng,s,pr,M,t,l,optimize=optimize,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+			rt_dat['saboteurProbability'][k_crashes] = time.time() - st_time
 			p2 = crashesProbability(stng,M,t,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
@@ -238,7 +278,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				print '###############################################'
 				print '###############################################'
 				print ''
-				return ((lower_bound,upper_bound),'Timeout')
+				return ((lower_bound,upper_bound),'Timeout'),rt_dat
 
 			# Update Bounds
 			lower_bound += p2 - p1
@@ -248,8 +288,10 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 			# BIT-ADDED BASED SAT COUNTING
 			# COMPUTES ONLY BOUNDS ON PRIORITY
 			print 'Adding k_maxSimulationConstraints...',time.time()
+			st_time=time.time()
 			k_maxSimulationConstraints_BOOL(stng,s, t, exact=True,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+			rt_dat['k_maxSimulationConstraints_BOOL'][k_crashes] = time.time() - st_time
 
 			for fail_at in range(t):
 
@@ -266,7 +308,9 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 				#require that if an edge fails, it fails at time immediatefailure
 				print 'Adding immediatefailureConstraints...',time.time()
+				st_time=time.time()
 				immediatefailureConstraints(stng, s, t,	fail_at):
+				rt_dat['immediatefailureConstraints'][k_crashes][fail_at] = time.time() - st_time
 
 				# Process and save Formula to file
 				glbl_vars.init()
@@ -275,12 +319,17 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				mis_cnf_file = cnf_file+'.ind'
 				# tact = Tactic('tseitin-cnf')
 				tact = With('tseitin-cnf',distributivity=False)
-				print_time("z3 to cnf...")
+				st1=print_time("z3 to cnf...")
 				cnf = tact(s.get_goal())[0]
-				print_time("cnf to dimacs...")
+				st2=print_time("cnf to dimacs...")
 				dimacs = cnf_to_DIMACS(cnf)
-				print_time("saving dimacs to file...")
+				st3=print_time("saving dimacs to file...")
 				save_DIMACS_to_file(dimacs,cnf_file)
+
+				# Store Conversion Times
+				rt_dat['z3 to cnf'][k_crashes][fail_at] = st2-st1
+				rt_dat['cnf to dimacs'][k_crashes][fail_at] = st3-st2
+
 
 				s.pop()
 
@@ -340,6 +389,18 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				print 'mis+approxMC time',mis_time+approxMC_mis_time
 				print ''
 
+				# Store Data into rt_dat
+				st_time=time.time()
+				rt_dat['numSols_sharpSAT'][k_crashes][fail_at] = numSols_sharpSAT
+				rt_dat['numSols_approxMC'][k_crashes][fail_at] = numSols_approxMC
+				rt_dat['numSols_approxMC_mis'][k_crashes][fail_at] = numSols_approxMC_mis
+				rt_dat['sharpSAT_time'][k_crashes][fail_at] = sharpSAT_time
+				rt_dat['approxMC_time'][k_crashes][fail_at] = approxMC_time
+				rt_dat['mis_time'][k_crashes][fail_at] = mis_time
+				rt_dat['approxMC_mis_time'][k_crashes][fail_at] = approxMC_mis_time
+				rt_dat['approxMC'][k_crashes][fail_at] = approxMC
+				rt_dat['timing_time'] += time.time() - st_time
+
 				numSols = numSols_sharpSAT
 
 				# Calculate Probabilities
@@ -368,13 +429,13 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 					print '###############################################'
 					print '###############################################'
 					print ''
-					return ((lower_bound,upper_bound),'Timeout')
+					return ((lower_bound,upper_bound),'Timeout'),rt_dat
 				elif numSols == 'error':
 					print_time('successProb error...')
 					print '###############################################'
 					print '###############################################'
 					print ''
-					return ((lower_bound,upper_bound),'error')
+					return ((lower_bound,upper_bound),'error'),rt_dat
 				else:
 					print numSols,type(numSols)
 					raise
@@ -394,7 +455,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	print '###############################################'
 	print '###############################################'
 	print ''
-	return (lower_bound,upper_bound)
+	return (lower_bound,upper_bound),rt_dat
 
 def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0, RR='message'):
@@ -415,17 +476,20 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	s = Goal()
 
 	glbl_vars.init()
+	st_time=time.time()
+	rt_dat = {}
+	rt_dat['timing_time'] = 0
 
-	print_time("Simulating network...")
+	t1=print_time("Simulating network...")
 	defineSimulationVariables(stng, M, t, basic_names=False)
 	generalSimulationConstraints(stng,s, M, t, l, l_is_upperBound=False)
 	specificSimulationConstraints(stng, s, pr, M, t, l, RR=RR)
 
-	print_time("setting weight vars...")
+	t2=print_time("setting weight vars...")
 	weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,precision=precision,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
-	print_time("converting to unweighted...")
+	t3=print_time("converting to unweighted...")
 	denom = wieghted_to_unweighted(stng,s,weight_vars,t,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
@@ -440,15 +504,15 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 	sol_file = "num_sols.txt"
 	# tact = Tactic('tseitin-cnf')
 	tact = With('tseitin-cnf',distributivity=False)
-	print_time("z3 to cnf...")
+	t4=print_time("z3 to cnf...")
 	cnf = tact(s)[0]
-	print_time("cnf to dimacs...")
+	t5=print_time("cnf to dimacs...")
 	dimacs = cnf_to_DIMACS(cnf)
-	print_time("saving dimacs to file...")
+	t6=print_time("saving dimacs to file...")
 	save_DIMACS_to_file(dimacs,cnf_file)
 
 	# Run SharpSat on file
-	print_time("running SharpSat on file...")
+	t7=print_time("running SharpSat on file...")
 	numSols,sharpSAT_time = run_sharpSAT(cnf_file,sol_file,return_time=True)
 	if not (isinstance(numSols,int) or isinstance(numSols,long)):
 		print "\n\n"
@@ -470,11 +534,22 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 		print "\n"
 
 	print ''
-	print_time('RETURNING priorityScore...')
+	t8=print_time('RETURNING priorityScore...')
+
+	st_time=time.time()
+	rt_dat['generate program'] = t2-t1
+	rt_dat['assign weights'] = t3-t2
+	rt_dat['get umc'] = t4-t3
+	rt_dat['z3 to cnf'] = t5-t4
+	rt_dat['cnf to dimacs'] = t6-t5
+	rt_dat['dimacs to file'] = t7-t6
+	rt_dat['sharpsat'] = sharpSAT_time #t8-t7
+	rt_dat['timing_time'] += time.time() - st_time
+
 	print '###############################################'
 	print '###############################################'
 	print ''
-	return prob
+	return prob, rt_dat
 
 def monte_carlo_Score(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
@@ -851,17 +926,22 @@ def get_doomed_state(stng, crash_model, pr, M, t, l,
 	All crash models which follow crash_model till time t and have k crashes
 	result in <l messages to be delivered
 	'''
+	st0=time.time()
 	sOpt = Solver()
+	st = time.time()
 	defineSimulationVariables(stng, M, t)
 	generalSimulationConstraints(stng,sOpt, M, t, l,l_is_upperBound=False)
 	specificSimulationConstraints(stng, sOpt, pr, M, t, l)
 	k_maxSimulationConstraints(stng,sOpt, t, exact=True,
 		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+	glbl_vars.doomed_state_rt['constraints'] += time.time() - st
 
 	doomed = 0
 
 	while True:
+		st = time.time()
 		temp_crash_model = getModel(sOpt)
+		glbl_vars.doomed_state_rt['solving'] += time.time() - st
 		if temp_crash_model is False:
 			# There exists no crash sequence  in which at least l messages arrive
 			# Hence, We have found a doomed state.
@@ -869,7 +949,11 @@ def get_doomed_state(stng, crash_model, pr, M, t, l,
 		assert doomed<=t
 		excludeCrashModel(stng,sOpt,crash_model,doomed,add_crashes=True,at_t_only=True,
 			omissions=True,crashes=True,delays=True)
+		st = time.time()
+		glbl_vars.doomed_state_rt['excluding'] += time.time() - st
 		doomed += 1
+
+	glbl_vars.doomed_state_rt['total'] += time.time() - st0
 
 	return doomed
 
@@ -951,24 +1035,27 @@ def CEGAR(stng, M, t, l,
 		print_time("\nCalculating Probabilities now...")
 		start_time = time.time()
 
+		glbl_vars.init_doomed_rt()
 		timings = {}
 		prob = {}
+		rt_dat = {}
+		rt_dat['timing_time'] = 0
 
 		timings[-4]=time.time()
-		prob['0b']=successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
+		prob['0b'],rt_dat['0b_inner']=successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 		timings[-3]=time.time()
-		prob['0o']=successProb(stng, pr, M, t, l,optimize=True,naive=True,
+		prob['0o'],rt_dat['0o_inner']=successProb(stng, pr, M, t, l,optimize=True,naive=True,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 		timings[-2]=time.time()
-		prob['0a']=successProb(stng, pr, M, t, l,optimize=False,naive=True,
+		prob['0a'],rt_dat['0a_inner']=successProb(stng, pr, M, t, l,optimize=False,naive=True,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 		timings[-1]=time.time()
-		# prob['1e']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		# prob['1e'],rt_dat['1e_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
 		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 		# 			RR='edge')
 		timings[0]=time.time()
-		prob['1m']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+		prob['1m'],rt_dat['1m_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='message')
 		timings[1]=time.time()
@@ -989,6 +1076,25 @@ def CEGAR(stng, M, t, l,
 					epsilon=epsilon,confidence=confidence)
 		timings[5]=time.time()
 
+
+
+		print ''
+		print ''
+		print '#Final Probabilities:'
+		print ''
+		print 'successProb bit-adder        \t',prob['0b'],timings[-3]-timings[-4]
+		print 'successProb OPT              \t',prob['0o'],timings[-2]-timings[-3]
+		print 'successProb NO OPT           \t',prob['0a'],timings[-1]-timings[-2]
+		# print 'priorityScore edgeRR         \t',prob['1e'],timings[0]-timings[-1]
+		print 'priorityScore messageRR      \t',prob['1m'],timings[1]-timings[0]
+		# print 'monte_carlo edgeRR           \t',prob['2e'],timings[2]-timings[1]
+		# print 'monte_carlo thread edgeRR    \t',prob['2et'],timings[3]-timings[2]
+		print 'monte_carlo messageRR        \t',prob['2m'],timings[4]-timings[3]
+		print 'monte_carlo thread messageRR \t',prob['2mt'],timings[5]-timings[4]
+		print ''
+		print ''
+
+		# Add parameters to object for saving
 		n=len(stng.g.V)
 		e=len(stng.g.E)
 		m=len(M)
@@ -1032,31 +1138,30 @@ def CEGAR(stng, M, t, l,
 		# params['M'] = [(msg.s.name, msg.t.name, msg.id) for msg in M]
 		# params['edges'] = [(edge.s,edge.t) for edge in stng.g.E]
 
-		save_scaling_data_to_file(params,prob)
+		# Store final timing data in object
+		st = time.time()
+		rt_dat['0b'] = timings[-3]-timings[-4]
+		rt_dat['0o'] = timings[-2]-timings[-3]
+		rt_dat['0a'] = timings[-1]-timings[-2]
+		# rt_dat['1e'] = timings[0]-timings[-1]
+		rt_dat['1m'] = timings[1]-timings[0]
+		# rt_dat['2e'] = timings[2]-timings[1]
+		# rt_dat['2et'] = timings[3]-timings[2]
+		rt_dat['2m'] = timings[4]-timings[3]
+		rt_dat['2mt'] = timings[5]-timings[4]
+		rt_dat['doomed_state_timing'] = glbl_vars.doomed_state_rt
+		rt_dat['timing_time'] += time.time() - st
 
-		print ''
-		print ''
-		print '#Final Probabilities:'
-		print ''
-		print 'successProb bit-adder        \t',prob['0b'],timings[-3]-timings[-4]
-		print 'successProb OPT              \t',prob['0o'],timings[-2]-timings[-3]
-		print 'successProb NO OPT           \t',prob['0a'],timings[-1]-timings[-2]
-		# print 'priorityScore edgeRR         \t',prob['1e'],timings[0]-timings[-1]
-		print 'priorityScore messageRR      \t',prob['1m'],timings[1]-timings[0]
-		# print 'monte_carlo edgeRR           \t',prob['2e'],timings[2]-timings[1]
-		# print 'monte_carlo thread edgeRR    \t',prob['2et'],timings[3]-timings[2]
-		print 'monte_carlo messageRR        \t',prob['2m'],timings[4]-timings[3]
-		print 'monte_carlo thread messageRR \t',prob['2mt'],timings[5]-timings[4]
-		print ''
-		print ''
+		# Store Parameters,Probabilities and run-time data to file
+		save_scaling_data_to_file(params,rt_dat,prob)
 
+		# Return from CEGAR
 		prob = prob['1m']
 
 		end_time = time.time()
 		count_time = end_time-start_time
 		print "Total Time taken = {}\n\n".format(str(count_time))
 		print "End Time", time.time()
-
 		print '###############################################'
 		print '###############################################'
 		print ''

@@ -14,3 +14,11 @@ def init():
 	hex2bin = dict('{:x} {:04b}'.format(x,x).split() for x in range(16))
 	bin2hex = dict('{:b} {:x}'.format(x,x).split() for x in range(16))
 	float_dec2bin_dict = {}
+
+def init_doomed_rt():
+	global doomed_state_rt
+	doomed_state_rt = {}
+	doomed_state_rt['constraints'] = 0
+	doomed_state_rt['solving'] = 0
+	doomed_state_rt['excluding'] = 0
+	doomed_state_rt['total'] = 0
