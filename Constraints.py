@@ -57,7 +57,7 @@ def generalSimulationConstraints(stng, s, M, t, l,
 			if i > 0:
 				s.add(Implies(stng.vars.crash(e, i-1), stng.vars.crash(e, i)))
 
-		#require that if an edge fails, it fails at time 0
+		#require that if an edge fails, it fails at time immediatefailure
 		if immediatefailure is not None:
 			s.add(Implies(stng.vars.crash(e, t-1),
 							And(stng.vars.crash(e, immediatefailure),
@@ -423,6 +423,14 @@ def prioritySimulationConstraints(stng, s, M, t, pr, l):
 #######
 # MINOR
 #######
+
+def immediatefailureConstraints(stng, s, t,
+	immediatefailure):
+	#require that if an edge fails, it fails at time immediatefailure
+	for e in stng.g.E:
+		s.add(Implies(stng.vars.crash(e, t-1),
+						And(stng.vars.crash(e, immediatefailure),
+							Not(stng.vars.crash(e, immediatefailure-1)))))
 
 def getUniqueConfigConstr(stng,m,v,i):
 	'''

@@ -186,8 +186,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 	print 'Adding constraints...',time.time()
 	defineSimulationVariables(stng, M, t)
-	if naive:
-		generalSimulationConstraints(stng,s, M, t, l)
+	generalSimulationConstraints(stng,s, M, t, l)
 	specificSimulationConstraints(stng, s, pr, M, t, l)
 
 	lower_bound=0
@@ -259,14 +258,15 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 					print '###############################################'
 					print '###############################################'
 					print ''
-					return ((lower_bound,upper_bound),'Timeout')
+					return ((lower_bound,upper_bound),'Timeout'),rt_dat
 
 				print '\n----------k,fail_at = {},{}------------'.format(k_crashes,fail_at)
 
 				s.push()
 
-				print 'Adding generalSimulationConstraints...',time.time()
-				generalSimulationConstraints(stng,s, M, t, l, immediatefailure=fail_at)
+				#require that if an edge fails, it fails at time immediatefailure
+				print 'Adding immediatefailureConstraints...',time.time()
+				immediatefailureConstraints(stng, s, t,	fail_at):
 
 				# Process and save Formula to file
 				glbl_vars.init()
