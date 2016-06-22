@@ -197,7 +197,6 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	rt_dat['approxMC_time'] = {}
 	rt_dat['mis_time'] = {}
 	rt_dat['approxMC_mis_time'] = {}
-	rt_dat['approxMC'] = {}
 	rt_dat['z3 to cnf'] = {}
 	rt_dat['cnf to dimacs'] = {}
 	rt_dat['timing_time'] += time.time() - st_time
@@ -247,7 +246,6 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 		rt_dat['approxMC_time'][k_crashes] = {}
 		rt_dat['mis_time'][k_crashes] = {}
 		rt_dat['approxMC_mis_time'][k_crashes] = {}
-		rt_dat['approxMC'][k_crashes] = {}
 		rt_dat['z3 to cnf'][k_crashes] = {}
 		rt_dat['cnf to dimacs'][k_crashes] = {}
 		rt_dat['timing_time'] += time.time() - st_time
@@ -309,7 +307,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				#require that if an edge fails, it fails at time immediatefailure
 				print 'Adding immediatefailureConstraints...',time.time()
 				st_time=time.time()
-				immediatefailureConstraints(stng, s, t,	fail_at):
+				immediatefailureConstraints(stng, s, t, fail_at)
 				rt_dat['immediatefailureConstraints'][k_crashes][fail_at] = time.time() - st_time
 
 				# Process and save Formula to file
@@ -398,7 +396,6 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				rt_dat['approxMC_time'][k_crashes][fail_at] = approxMC_time
 				rt_dat['mis_time'][k_crashes][fail_at] = mis_time
 				rt_dat['approxMC_mis_time'][k_crashes][fail_at] = approxMC_mis_time
-				rt_dat['approxMC'][k_crashes][fail_at] = approxMC
 				rt_dat['timing_time'] += time.time() - st_time
 
 				numSols = numSols_sharpSAT
