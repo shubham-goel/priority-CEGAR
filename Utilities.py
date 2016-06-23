@@ -572,13 +572,11 @@ def new_unused_variable():
 ########
 
 def cnf_to_DIMACS(cnf):
-	# print "FORMULA"
-	# print cnf
-
+	'''
+	Convert cnf formulaoutputted bu z3 into DIMACS Format
+	'''
 	glbl_vars.init()
-	dimacs = []
-	for clause in cnf:
-		dimacs.append(clause_to_DMACS(clause))
+	dimacs = [clause_to_DMACS(clause) for clause in cnf]
 
 	return dimacs
 
@@ -587,26 +585,31 @@ def clause_to_DMACS(clause):
 
 	if clause[:3] == "Or(":
 		clause = clause[3:-1]
-	clause = clause.split(",")
 
-	dmacs_clause = []
-	for literal in clause:
-		literal=trim_sides(literal)
-		neg = False
-		if len(literal) > 5 and literal[:4]=="Not(":
-			literal = literal[4:-1]
-			neg = True
-		literal=trim_sides(literal)
-		if not (literal in glbl_vars.variable_name_to_number.keys()):
-			glbl_vars.variable_name_to_number[literal] = glbl_vars.variable_number
-			glbl_vars.variable_number += 1
-
-		if neg:
-			dmacs_clause.append(-1*glbl_vars.variable_name_to_number[literal])
-		else:
-			dmacs_clause.append(glbl_vars.variable_name_to_number[literal])
+	dmacs_clause = [literal_to_number(literal) for literal in clause.split(",")]
 
 	return dmacs_clause
+
+def literal_to_number(literal):
+	literal=literal.strip(" \t\n")
+	neg = False
+	if len(literal) > 5 and literal[:4]=="Not(":
+		literal = literal[4:-1]
+		neg = True
+	literal=literal.strip(" \t\n")
+	lit_num = None
+
+	try:
+		lit_num = glbl_vars.variable_name_to_number[literal]
+	except KeyError:
+		lit_num = glbl_vars.variable_number
+		glbl_vars.variable_number += 1
+		glbl_vars.variable_name_to_number[literal] = lit_num
+
+	if neg:
+		return (-1*lit_num)
+	else:
+		return (lit_num)
 
 def save_DIMACS_to_file(dimacs, filename):
 	num_vars = glbl_vars.variable_number-1
@@ -614,27 +617,15 @@ def save_DIMACS_to_file(dimacs, filename):
 	with open(filename, "w") as f:
 		header = "p cnf {} {}\n".format(num_vars,num_clauses)
 		f.write(header)
-		for clause in dimacs:
-			f.write(format_DIMACS_clause(clause))
+		f.write(''.join([format_DIMACS_clause(clause) for clause in dimacs]))
 	print ''
 	print "num_vars =",num_vars
 	print "num_clauses =",num_clauses
 	print ''
 
 def format_DIMACS_clause(clause):
-	formatted = " ".join([str(lit) for lit in clause])
-	formatted = formatted + " 0\n"
+	formatted = ' '.join([str(lit) for lit in clause])+ " 0\n"
 	return formatted
-
-def trim_sides(literal):
-	start=0
-	end=len(literal)
-	undesirables = [' ','\n','\t']
-	while literal[start] in undesirables:
-		start += 1
-	while literal[end-1] in undesirables:
-		end -= 1
-	return literal[start:end]
 
 ########
 # WMC
