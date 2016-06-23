@@ -67,3 +67,6 @@ local/*
 */local/*
 *.curr
 schedules/*
+umc*
+output*
+umc_dimacs*

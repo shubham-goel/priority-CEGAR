@@ -1,0 +1,100 @@
+
+py ScheduleTwoPathsCEGAR.py 10 8 25 9 8 0 -p -l
+epsilon=0.05,confidence=0.999999   num_iterations=1382
+
+		UNTHREADED
+		==========
+		monte_carlo edgeRR           	0.743849493488 11.7651789188
+		monte_carlo messageRR        	0.748914616498 10.7845849991
+
+		monte_carlo edgeRR           	0.743125904486 10.3030350208
+		monte_carlo messageRR        	0.757597684515 9.72950792313
+
+		threads=1
+		===========
+		monte_carlo thread edgeRR    	0.793053545586 10.5978269577
+		monte_carlo thread messageRR 	0.768451519537 9.9485809803
+
+		monte_carlo thread edgeRR    	0.76483357453 11.1121239662
+		monte_carlo thread messageRR 	0.750361794501 9.9084880352
+
+		threads=2
+		===========
+		monte_carlo thread edgeRR    	0.774240231548 10.3153400421
+		monte_carlo thread messageRR 	0.764109985528 5.19740009308
+
+		monte_carlo thread edgeRR    	0.73516642547 9.88154101372
+		monte_carlo thread messageRR 	0.761215629522 5.23147106171
+
+		threads=3
+		===========
+		monte_carlo thread edgeRR    	0.718523878437 6.54942202568
+		monte_carlo thread messageRR 	0.717800289436 6.1206870079
+
+		monte_carlo thread edgeRR    	0.743849493488 6.71720290184
+		monte_carlo thread messageRR 	0.717800289436 6.13032484055
+
+		threads=4
+		===========
+		monte_carlo thread edgeRR    	0.719247467438 5.77887988091
+		monte_carlo thread messageRR 	0.762662807525 5.54244589806
+
+		monte_carlo thread edgeRR    	0.730824891462 5.59054589272
+		monte_carlo thread messageRR 	0.742402315485 5.23470497131
+
+		threads=5
+		===========
+		monte_carlo thread edgeRR    	0.748914616498 5.41428494453
+		monte_carlo thread messageRR 	0.748914616498 5.20566892624
+
+		monte_carlo thread edgeRR    	0.779305354559 5.90175294876
+		monte_carlo thread messageRR 	0.779305354559 5.21128606796
+
+		threads=6
+		=========
+		monte_carlo thread edgeRR    	0.787264833575 5.68625092506
+		monte_carlo thread messageRR 	0.782923299566 5.4894759655
+
+		monte_carlo thread edgeRR    	0.730824891462 6.21600794792
+		monte_carlo thread messageRR 	0.739507959479 5.27966117859
+
+		threads=7
+		=========
+		monte_carlo thread edgeRR    	0.756874095514 5.94632792473
+		monte_carlo thread messageRR 	0.756874095514 5.23948383331
+
+		monte_carlo thread edgeRR    	0.711287988423 5.7993311882
+		monte_carlo thread messageRR 	0.711287988423 5.56814289093
+
+
+
+
+py ScheduleTwoPathsCEGAR.py 10 8 25 9 8 0 -p -l
+epsilon=0.01,confidence=0.999   num_iterations=34539
+
+		UNTHREADED
+		==========
+		monte_carlo edgeRR           	0.750137525696 254.565205812
+		monte_carlo messageRR        	0.748950461797 233.348862886
+
+		threads=3
+		===========
+		monte_carlo thread edgeRR    	0.753756622948 137.963171959
+		monte_carlo thread messageRR 	0.754625206289 133.470707178
+
+		monte_carlo thread edgeRR    	0.755059497959 143.987556934
+		monte_carlo thread messageRR 	0.754885781291 130.539661884
+
+		threads=4
+		===========
+		monte_carlo thread edgeRR    	0.755754364631 132.913429022
+		monte_carlo thread messageRR 	0.752627464605 126.911367893
+
+		monte_carlo thread edgeRR    	0.755667506297 132.212594986
+		monte_carlo thread messageRR 	0.750195431252 130.534534216
+
+		threads=5
+		===========
+		monte_carlo thread edgeRR    	0.765337734156 148.070328951
+		monte_carlo thread messageRR 	0.747676539564 140.207361937
+

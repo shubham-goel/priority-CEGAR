@@ -1,0 +1,65 @@
+RUN TIME DATA MEASURED
+-------------------------------------------------
+
+rt_dat['0b']
+rt_dat['0o']
+rt_dat['0a']
+rt_dat['1e']
+rt_dat['1m']
+rt_dat['2e']
+rt_dat['2et']
+rt_dat['2m']
+rt_dat['2mt']
+rt_dat['doomed_state_timing']
+rt_dat['timing_time']
+
+-------------------------------------------------
+
+rt_dat['0b_inner'] => (bit-adder)	(SuccessProb)
+rt_dat['0o_inner'] => (naive,opt)	(SuccessProb)
+rt_dat['0a_inner'] => (naive)		(SuccessProb)
+
+	timing_time
+	generate program
+	k_maxSimulationConstraints_BOOL	[k]
+	saboteurProbability				[k]
+	immediatefailureConstraints		[k][t]
+	z3 to cnf						[k][t]
+	cnf to dimacs					[k][t]
+	numSols_sharpSAT				[k][t]
+	numSols_approxMC				[k][t]
+	numSols_approxMC_mis			[k][t]
+	sharpSAT_time					[k][t]
+	approxMC_time					[k][t]
+	mis_time						[k][t]
+	approxMC_mis_time				[k][t]
+	approxMC						[k][t]
+
+
+-------------------------------------------------
+
+
+rt_dat['1m_inner'] => (messageRR)  (WMC) (priorityScore)
+
+	timing_time
+	generate program
+	assign weights
+	get umc
+	z3 to cnf
+	cnf to dimacs
+	dimacs to file
+	sharpsat
+	timing_time
+
+
+-------------------------------------------------
+
+
+rt_dat['doomed_state_timing'] => (get_doomed_state)
+
+	constraints
+	solving
+	excluding
+	total
+
+-------------------------------------------------
