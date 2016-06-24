@@ -279,7 +279,6 @@ def equate_bit_vectors_constr(s, vec1, vec2, add1=False):
 
 	return And(constr)
 
-
 def def_bit_vectors(stng, k_omissions=0, k_crashes=0, k_delays=0):
 
 	bit_vector_omissions = {}
@@ -317,7 +316,6 @@ def def_bit_vectors(stng, k_omissions=0, k_crashes=0, k_delays=0):
 		bit_vector_delays=None
 
 	return bit_vector_omissions,bit_vector_crashes,bit_vector_delays
-
 
 def addPriorityConstraints(stng, M, s=None):
 	'''
@@ -419,6 +417,77 @@ def prioritySimulationConstraints(stng, s, M, t, pr, l):
 					constr = Implies(stng.vars.config(m,v,i),Or(ors))
 					constraints_used.append(constr)
 	s.add(And(constraints_used))
+
+############
+# HEURISTICS
+############
+
+def min_max_vertex_load(stng, s, M, t, minimum=False):
+	vertex_loads = []
+	for v in stng.g.V:
+		for i in range(t):
+			l=[If(stng.vars.config(m,v,i),1,0) for m in M if v in stng.UFSv[m]]
+			if l:
+				vertex_loads.append(Sum(l))
+	if minimum:
+		min_max = z3min(vertex_loads)
+	else:
+		min_max = z3max(vertex_loads)
+
+	return min_max
+
+def min_max_edge_queue(stng, s, M, t, minimum=False):
+	edge_queues = []
+	for e in stng.g.E:
+		for i in range(t):
+			l=[If(stng.vars.config(m,e.s,i),1,0) for m in M
+					if ((e.s in stng.UFSv[m])and(e in stng.FCe[m]))]
+			if l:
+				edge_queues.append(Sum(l))
+	if minimum:
+		min_max = z3min(edge_queues)
+	else:
+		min_max = z3max(edge_queues)
+
+	return min_max
+
+def minimize_load(stng, s, M, t):
+	return s.minimize(min_max_vertex_load(stng, s, M, t))
+
+def minimize_queue_size(stng, s, M, t):
+	return s.minimize(min_max_edge_queue(stng, s, M, t))
+
+def apply_longerPath_first(stng, s, M, t, pr):
+	c=[]
+	for m in M:
+		for v in stng.UFSv[m]:
+			c.append(And([Implies((m2.Fpath_len>m.Fpath_len),(pr[m2][v]<pr[m][v]))
+							for m2 in M if v in stng.UFSv[m2]]))
+	s.add(And(c))
+
+def apply_longerPath_last(stng, s, M, t, pr):
+	c=[]
+	for m in M:
+		for v in stng.UFSv[m]:
+			c.append(And([Implies((m2.Fpath_len>m.Fpath_len),(pr[m2][v]>pr[m][v]))
+							for m2 in M if v in stng.UFSv[m2]]))
+	s.add(And(c))
+
+def apply_heuristic(stng, s, M, t, pr, l, heuristic=None):
+	print 'applying',heuristic
+	h = None
+	if heuristic == 'minimize_load':
+		h = minimize_load(stng, s, M, t)
+	if heuristic == 'minimize_queue_size':
+		h = minimize_queue_size(stng, s, M, t)
+	elif heuristic == 'longerPath_first':
+		apply_longerPath_first(stng, s, M, t, pr)
+	elif heuristic == 'longerPath_last':
+		apply_longerPath_last(stng, s, M, t, pr)
+	elif heuristic is not None:
+		sys.stderr.write('Warning: Heuristic {} not found\n'.format(heuristic))
+
+	return h
 
 #######
 # MINOR

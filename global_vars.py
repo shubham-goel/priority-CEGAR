@@ -22,3 +22,7 @@ def init_doomed_rt():
 	doomed_state_rt['solving'] = 0
 	doomed_state_rt['excluding'] = 0
 	doomed_state_rt['total'] = 0
+
+def init_heuristics(list_heuristics):
+	global heuristics
+	heuristics = list_heuristics

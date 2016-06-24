@@ -6,7 +6,6 @@ class Vars:
 	def __init__(self):
 		self.vars = {}
 
-
 	def def_sched(self, m, e, i, basic_names=False):
 
 		if basic_names:
@@ -151,8 +150,6 @@ class Vertex:
 	def nextS(self,m):
 		if m in self.__nextS:
 			return self.__nextS[m]
-		#if (m,self) in SC:
-		#    return SC[(m,self)]
 
 	def setNextS(self, m, u):
 		self.__nextS[m] = u
@@ -160,8 +157,6 @@ class Vertex:
 	def nextF(self,m):
 		if m in self.__nextF:
 		   return self.__nextF[m]
-		# if (m,self) in FC:
-		#     return FC[(m,self)]
 
 	def setNextF(self, m, u):
 		self.__nextF[m] = u
@@ -173,7 +168,6 @@ class Vertex:
 		if not other:
 			return False
 		return self.name == other.name
-
 
 class Edge:
 	def __init__(self, s, t):
@@ -199,13 +193,13 @@ class Graph:
 			if e.s == v and e.t == u:
 				return e
 
-
 class Message:
 	def __init__(self, s, t, name):
 		self.s = s
 		self.t = t
 		self.name = str(name)
 		self.id = name
+		self.Fpath_len = None
 
 	def __str__(self):
 		return self.name

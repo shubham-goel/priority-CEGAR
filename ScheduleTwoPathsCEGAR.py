@@ -574,6 +574,7 @@ def monte_carlo_Score(stng, pr, M, t, l,
 	for i in range(num_iterations):
 		if i%4096 == 0:
 			print 'Progress:{:.2f}%'.format(i/float(num_iterations)*100)
+			sys.stderr.write('Progress:{:.2f}%'.format(i/float(num_iterations)*100))
 		if time.time() - start_time > glbl_vars.timeout_limit:
 			print_time('Timeout monte_carlo_Score...')
 			print '###############################################'
@@ -709,6 +710,7 @@ def rand_sim_MessageRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeo
 
 		if i%4096 == 0:
 			print 'Thread{} Progress:{:.2f}%'.format(id_thread,i/float(num_iter)*100)
+			sys.stderr.write('Thread{} Progress:{:.2f}%'.format(id_thread,i/float(num_iter)*100))
 
 		if time.time() - start_time > glbl_vars.timeout_limit:
 			final_res = [successful_iter,i]
@@ -964,19 +966,17 @@ def CEGAR(stng, M, t, l,
 	:param l: At least l messages should arrive.
 	:return: A (k,l)-resistant schedule, if it exists, and otherwise False.
 	'''
-	#redundant: j = 1
-	#redundant: counter=1
 	print ''
 	print '###############################################'
 	print '###############################################'
 	print_time('RUNNING CEGAR...')
 	print ''
 
-	s = Solver()
+	s = Optimize()
 
 	# Add priority uniqueness constraints
 	print_time("defining priority vars...")
-	pr = definePriorityVariables(stng, M, heuristic=True)
+	pr_int_vars = definePriorityVariables(stng, M, heuristic=True)
 	print_time("defining simulation vars...")
 	defineSimulationVariables(stng, M, t)
 	print_time("adding priority constraints...")
@@ -984,191 +984,204 @@ def CEGAR(stng, M, t, l,
 
 	# Add HERE more heuristics/constraints
 	# for getting good initial message priorities
-	# print_time("implementing heuristic...")
-	# prioritySimulationConstraints(stng, s, M, t, pr, l)
+	print_time("implementing heuristic...")
+	prioritySimulationConstraints(stng, s, M, t, pr_int_vars, l)
+	glbl_vars.init_heuristics([None,'longerPath_last','longerPath_first','minimize_queue_size','minimize_load'])
 
-	print_time("solving z3 program...")
-	mdl = getModel(s)
-	if not mdl:
-		print 'NO valid model EXISTS'
-		return False
+	heuristic_probs = {}
 
-	print_time("generating priorities...")
-	pr = GeneratePriorities(stng, mdl, M)
+	s.push()
+	for heuristic in glbl_vars.heuristics:
+		s.pop()
+		s.push()
+		print 'APPLYING HEURISTIC...',heuristic
+		h = apply_heuristic(stng, s, M, t, pr_int_vars, l, heuristic=heuristic)
 
-	# if load_priority:
-	# 	pr = load_priority_from_file(stng, M, "priorities.curr")
-	# if save_priority:
-	# 	save_priority_to_file(stng, pr, "priorities.curr")
+		print_time("solving z3 program...")
+		mdl = getModel(s)
+		if not mdl:
+			print 'NO valid model EXISTS'
+			return False
+		elif h is not None:
+			print 'Extreme Objective Value =',h.value()
 
-	print_message_priorities(stng,mdl,M)
+		print_time("generating priorities...")
+		pr = GeneratePriorities(stng, mdl, M)
 
-	if countFaults:
+		print_message_priorities(stng,mdl,M)
 
-		print_time("\n\nCounting Sabeteur Strategies for Schedule now...")
-		num_faults = count_WFS(stng, pr, M, t, l,
-				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
-		print_time("Ended Counting Sabeteur Strategies...")
+		if countFaults:
 
-		print "Number of distinct stratergies = {}\n\n".format(str(num_faults))
-		print "End Time", time.time()
+			print_time("\n\nCounting Sabeteur Strategies for Schedule now...")
+			num_faults = count_WFS(stng, pr, M, t, l,
+					k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+			print_time("Ended Counting Sabeteur Strategies...")
 
-		return (num_faults,count_time)
+			print "Number of distinct stratergies = {}\n\n".format(str(num_faults))
+			print "End Time", time.time()
 
-	elif probabalistic:
+			return (num_faults,count_time)
 
-		p_omissions=0.015625
-		p_crashes=0.015625
-		p_delays=0
-		precision=10
+		elif probabalistic:
 
-		epsilon=0.01
-		confidence=0.999
+			p_omissions=0.015625
+			p_crashes=0.015625
+			p_delays=0
+			precision=10
 
-		p_omissions=reduce_precision(p_omissions,precision)
-		p_crashes=reduce_precision(p_crashes,precision)
-		p_delays=reduce_precision(p_delays,precision)
+			epsilon=0.01
+			confidence=0.999
 
-		print_time("\nCalculating Probabilities now...")
-		start_time = time.time()
+			p_omissions=reduce_precision(p_omissions,precision)
+			p_crashes=reduce_precision(p_crashes,precision)
+			p_delays=reduce_precision(p_delays,precision)
 
-		glbl_vars.init_doomed_rt()
-		timings = {}
-		prob = {}
-		rt_dat = {}
-		rt_dat['timing_time'] = 0
+			print_time("\nCalculating Probabilities now...")
+			start_time = time.time()
 
-		timings[-4]=time.time()
-		prob['0b'],rt_dat['0b_inner']=successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
-				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		timings[-3]=time.time()
-		prob['0o'],rt_dat['0o_inner']=successProb(stng, pr, M, t, l,optimize=True,naive=True,
+			glbl_vars.init_doomed_rt()
+			timings = {}
+			prob = {}
+			rt_dat = {}
+			rt_dat['timing_time'] = 0
+
+			timings[-4]=time.time()
+			prob['0b'],rt_dat['0b_inner']=successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		timings[-2]=time.time()
-		prob['0a'],rt_dat['0a_inner']=successProb(stng, pr, M, t, l,optimize=False,naive=True,
-					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		timings[-1]=time.time()
-		# prob['1e'],rt_dat['1e_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
-		# 			RR='edge')
-		timings[0]=time.time()
-		prob['1m'],rt_dat['1m_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
-					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
-					RR='message')
-		timings[1]=time.time()
-		# prob['2e']=monte_carlo_Score(stng, pr, M, t, l,RR='edge',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=epsilon,confidence=confidence)
-		timings[2]=time.time()
-		# prob['2et']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=epsilon,confidence=confidence)
-		timings[3]=time.time()
-		prob['2m']=monte_carlo_Score(stng, pr, M, t, l,RR='message',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=epsilon,confidence=confidence)
-		timings[4]=time.time()
-		prob['2mt']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=epsilon,confidence=confidence)
-		timings[5]=time.time()
+			timings[-3]=time.time()
+			prob['0o'],rt_dat['0o_inner']=successProb(stng, pr, M, t, l,optimize=True,naive=True,
+						p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+			timings[-2]=time.time()
+			prob['0a'],rt_dat['0a_inner']=successProb(stng, pr, M, t, l,optimize=False,naive=True,
+						p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+			timings[-1]=time.time()
+			# prob['1e'],rt_dat['1e_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+			# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
+			# 			RR='edge')
+			timings[0]=time.time()
+			prob['1m'],rt_dat['1m_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+						p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
+						RR='message')
+			timings[1]=time.time()
+			# prob['2e']=monte_carlo_Score(stng, pr, M, t, l,RR='edge',
+			# 			p_omissions=p_omissions,p_crashes=p_crashes,
+			# 			epsilon=epsilon,confidence=confidence)
+			timings[2]=time.time()
+			# prob['2et']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
+			# 			p_omissions=p_omissions,p_crashes=p_crashes,
+			# 			epsilon=epsilon,confidence=confidence)
+			timings[3]=time.time()
+			prob['2m']=monte_carlo_Score(stng, pr, M, t, l,RR='message',
+						p_omissions=p_omissions,p_crashes=p_crashes,
+						epsilon=epsilon,confidence=confidence)
+			timings[4]=time.time()
+			prob['2mt']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
+						p_omissions=p_omissions,p_crashes=p_crashes,
+						epsilon=epsilon,confidence=confidence)
+			timings[5]=time.time()
 
 
 
-		print ''
-		print ''
-		print '#Final Probabilities:'
-		print ''
-		print 'successProb bit-adder        \t',prob['0b'],timings[-3]-timings[-4]
-		print 'successProb OPT              \t',prob['0o'],timings[-2]-timings[-3]
-		print 'successProb NO OPT           \t',prob['0a'],timings[-1]-timings[-2]
-		# print 'priorityScore edgeRR         \t',prob['1e'],timings[0]-timings[-1]
-		print 'priorityScore messageRR      \t',prob['1m'],timings[1]-timings[0]
-		# print 'monte_carlo edgeRR           \t',prob['2e'],timings[2]-timings[1]
-		# print 'monte_carlo thread edgeRR    \t',prob['2et'],timings[3]-timings[2]
-		print 'monte_carlo messageRR        \t',prob['2m'],timings[4]-timings[3]
-		print 'monte_carlo thread messageRR \t',prob['2mt'],timings[5]-timings[4]
-		print ''
-		print ''
+			print ''
+			print ''
+			print '#Final Probabilities:'
+			print ''
+			print 'successProb bit-adder        \t',prob['0b'],timings[-3]-timings[-4]
+			print 'successProb OPT              \t',prob['0o'],timings[-2]-timings[-3]
+			print 'successProb NO OPT           \t',prob['0a'],timings[-1]-timings[-2]
+			# print 'priorityScore edgeRR         \t',prob['1e'],timings[0]-timings[-1]
+			print 'priorityScore messageRR      \t',prob['1m'],timings[1]-timings[0]
+			# print 'monte_carlo edgeRR           \t',prob['2e'],timings[2]-timings[1]
+			# print 'monte_carlo thread edgeRR    \t',prob['2et'],timings[3]-timings[2]
+			print 'monte_carlo messageRR        \t',prob['2m'],timings[4]-timings[3]
+			print 'monte_carlo thread messageRR \t',prob['2mt'],timings[5]-timings[4]
+			print ''
+			print ''
 
-		# Add parameters to object for saving
-		n=len(stng.g.V)
-		e=len(stng.g.E)
-		m=len(M)
-		t=t
-		l=l
-		k_omissions=k_omissions
-		k_crashes=k_crashes
-		k_delays=k_delays
-		optimize=optimize
-		showProgress=showProgress
-		countFaults=countFaults
-		probabalistic=probabalistic
-		load_priority=load_priority
-		save_priority=save_priority
-		p_omissions=p_omissions
-		p_crashes=p_crashes
-		p_delays=p_delays
-		precision=precision
+			heuristic_probs[heuristic]={}
+			heuristic_probs[heuristic]['messageRR']=prob['1m']
+			heuristic_probs[heuristic]['edgeRR']=prob['1e']
 
-		params = {}
-		params['n'] = n
-		params['e'] = e
-		params['m'] = m
-		params['t'] = t
-		params['l'] = l
-		params['optimize'] = optimize
-		params['showProgress'] = showProgress
-		params['countFaults'] = countFaults
-		params['probabalistic'] = probabalistic
-		params['load_priority'] = load_priority
-		params['save_priority'] = save_priority
-		params['k_omissions'] = k_omissions
-		params['k_crashes'] = k_crashes
-		params['k_delays'] = k_delays
-		params['p_omissions'] = p_omissions
-		params['p_crashes'] = p_crashes
-		params['p_delays'] = p_delays
-		params['precision'] = precision
-		params['confidence'] = confidence
-		params['epsilon'] = epsilon
-		# params['M'] = [(msg.s.name, msg.t.name, msg.id) for msg in M]
-		# params['edges'] = [(edge.s,edge.t) for edge in stng.g.E]
+			# Add parameters to object for saving
+			n=len(stng.g.V)
+			e=len(stng.g.E)
+			m=len(M)
+			t=t
+			l=l
+			k_omissions=k_omissions
+			k_crashes=k_crashes
+			k_delays=k_delays
+			optimize=optimize
+			showProgress=showProgress
+			countFaults=countFaults
+			probabalistic=probabalistic
+			load_priority=load_priority
+			save_priority=save_priority
+			p_omissions=p_omissions
+			p_crashes=p_crashes
+			p_delays=p_delays
+			precision=precision
 
-		# Store final timing data in object
-		st = time.time()
-		rt_dat['0b'] = timings[-3]-timings[-4]
-		rt_dat['0o'] = timings[-2]-timings[-3]
-		rt_dat['0a'] = timings[-1]-timings[-2]
-		# rt_dat['1e'] = timings[0]-timings[-1]
-		rt_dat['1m'] = timings[1]-timings[0]
-		# rt_dat['2e'] = timings[2]-timings[1]
-		# rt_dat['2et'] = timings[3]-timings[2]
-		rt_dat['2m'] = timings[4]-timings[3]
-		rt_dat['2mt'] = timings[5]-timings[4]
-		rt_dat['doomed_state_timing'] = glbl_vars.doomed_state_rt
-		rt_dat['timing_time'] += time.time() - st
+			params = {}
+			params['n'] = n
+			params['e'] = e
+			params['m'] = m
+			params['t'] = t
+			params['l'] = l
+			params['optimize'] = optimize
+			params['showProgress'] = showProgress
+			params['countFaults'] = countFaults
+			params['probabalistic'] = probabalistic
+			params['load_priority'] = load_priority
+			params['save_priority'] = save_priority
+			params['k_omissions'] = k_omissions
+			params['k_crashes'] = k_crashes
+			params['k_delays'] = k_delays
+			params['p_omissions'] = p_omissions
+			params['p_crashes'] = p_crashes
+			params['p_delays'] = p_delays
+			params['precision'] = precision
+			params['confidence'] = confidence
+			params['epsilon'] = epsilon
 
-		# Store Parameters,Probabilities and run-time data to file
-		save_scaling_data_to_file(params,rt_dat,prob)
+			# Store final timing data in object
+			st = time.time()
+			rt_dat['0b'] = timings[-3]-timings[-4]
+			rt_dat['0o'] = timings[-2]-timings[-3]
+			rt_dat['0a'] = timings[-1]-timings[-2]
+			# rt_dat['1e'] = timings[0]-timings[-1]
+			rt_dat['1m'] = timings[1]-timings[0]
+			# rt_dat['2e'] = timings[2]-timings[1]
+			# rt_dat['2et'] = timings[3]-timings[2]
+			rt_dat['2m'] = timings[4]-timings[3]
+			rt_dat['2mt'] = timings[5]-timings[4]
+			rt_dat['doomed_state_timing'] = glbl_vars.doomed_state_rt
+			rt_dat['timing_time'] += time.time() - st
 
-		# Return from CEGAR
-		prob = prob['1m']
+			# Store Parameters,Probabilities and run-time data to file
+			save_scaling_data_to_file(params,rt_dat,prob)
 
-		end_time = time.time()
-		count_time = end_time-start_time
-		print "Total Time taken = {}\n\n".format(str(count_time))
-		print "End Time", time.time()
-		print '###############################################'
-		print '###############################################'
-		print ''
-		return (prob,count_time)
+			# Return from CEGAR
+			prob = prob['1m']
 
-	else:
-		raise ValueError("Only implemented counting of faults and probablistic setting")
-		return Adverserial(stng, pr, M, t, l,
-					k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays,
-					optimize=optimize, showProgress=showProgress)
+			end_time = time.time()
+			count_time = end_time-start_time
+			print "Total Time taken = {}\n\n".format(str(count_time))
+			print "End Time", time.time()
+			print '###############################################'
+			print '###############################################'
+			print ''
+			# return (prob,count_time)
+
+		else:
+			raise ValueError("Only implemented counting of faults and probablistic setting")
+			return Adverserial(stng, pr, M, t, l,
+						k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays,
+						optimize=optimize, showProgress=showProgress)
+
+	for heuristic in glbl_vars.heuristics:
+		print heuristic,'\tmessageRR\t=',heuristic_probs[heuristic]['messageRR']
+		print heuristic,'\tedgeRR   \t=',heuristic_probs[heuristic]['edgeRR']
 
 def main(n, m, e, t, l,
 	k_omissions=0, k_crashes=0, k_delays=0,

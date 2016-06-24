@@ -152,6 +152,8 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 			sys.stderr.write("NO PATH\n")
 			os._exit(2)
 
+		m.Fpath_len = len(p)
+
 		for v in p[1:]:
 			nextV = V[v]
 			FCv[m].append(nextV)

@@ -336,6 +336,26 @@ def reduce_precision(p,precision):
 			number += power
 	return number
 
+def z3max(x,y=None):
+	if y is None:
+		if len(x) <= 1:
+			# print len(x), x
+			return x[0]
+		else:
+			mid = len(x)/2
+			return z3max(z3max(x[:mid]),z3max(x[mid:]))
+	else:
+		return If(x>y,x,y)
+
+def z3min(x,y=None):
+	if y is None:
+		if len(x) <= 1:
+			return x[0]
+		else:
+			mid = len(x)/2
+			return z3min(z3min(x[:mid]),z3min(x[mid:]))
+	else:
+		return If(x>y,y,x)
 
 ##########
 # PRINTING
@@ -766,6 +786,10 @@ def wieghted_to_unweighted(stng,s,weight_vars,t,
 
 	return denom
 
+########
+# BASH
+########
+
 def vaildate_exit_code(exit_code):
 	acceptable=[0,10,20]
 	if exit_code in acceptable:
@@ -801,7 +825,7 @@ def run_mis(cnf_file,output_cnf_file):
 	start_t = time.time()
 
 	# Run MIS on file
-	cmd = 'cd mis/ && python MIS.py -output=../mis.out {}'.format('../'+cnf_file)
+	cmd = 'cd mis/ && python MIS.py -output=../mis.out {} >/dev/null'.format('../'+cnf_file)
 	bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
 	print 'mis',bash_output
 
@@ -871,7 +895,6 @@ def run_approxMC(cnf_file,mis=False):
 			return 'error','error'
 		else:
 			return numSols,run_time
-
 
 def run_sharpSAT(cnf_file,sol_file,return_time=False):
 	'''

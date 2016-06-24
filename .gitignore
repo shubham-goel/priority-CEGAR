@@ -70,3 +70,7 @@ schedules/*
 umc*
 output*
 umc_dimacs*
+mis/*
+results/
+scalmc
+sharpSAT
