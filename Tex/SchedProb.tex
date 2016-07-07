@@ -1,0 +1,383 @@
+\documentclass[11pt,eepic]{article}
+	\addtolength{\parskip}{1ex}
+
+	\usepackage{amssymb}
+	\usepackage{amsmath}
+	\usepackage{dsfont}
+	\usepackage{xspace}
+	\usepackage{graphicx}
+	\usepackage{mathabx}
+
+
+	\usepackage{algpseudocode}
+	\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+	\renewcommand{\algorithmicensure}{\textbf{Output:}}
+
+
+	%\renewcommand{\baselinestretch}{1.15}
+
+	\newcommand{\zug}[1]{\langle #1  \rangle}
+	\newcommand{\set}[1]{\{ #1  \}}
+	\newcommand{\stam}[1]{}
+	\newcommand{\bft}{\mbox{\em \bf true}}
+	\newcommand{\bff}{\mbox{\em \bf false}}
+	\newcommand{\track}[1]{{\textcolor{red}{#1}}}
+
+	\setlength{\evensidemargin}{0in}
+	\setlength{\oddsidemargin}{0in}
+	\setlength{\textwidth}{6.2in}
+	\setlength{\textheight}{8.3in}
+	\setlength{\topmargin}{0in}
+	\setlength{\headheight}{0in}
+	\setlength{\headsep}{.4in}
+	\setlength{\itemsep}{-\parsep}
+	\renewcommand{\topfraction}{.9}
+	\renewcommand{\textfraction}{.1}
+	\setlength{\parskip}{\smallskipamount}
+
+
+
+	\newcommand{\A}{{\cal A}}
+	\newcommand{\B}{{\cal B}}
+	\newcommand{\C}{{\cal C}}
+	\newcommand{\D}{{\cal D}}
+	\newcommand{\G}{{\cal G}}
+	\renewcommand{\L}{{\cal L}}
+	\newcommand{\N}{{\cal N}}
+	\newcommand{\M}{{\cal M}}
+	\newcommand{\T}{{\cal T}}
+	\renewcommand{\S}{{\cal S}}
+
+
+	\renewcommand{\tt}{\texttt{tt}}
+	\newcommand{\ff}{\texttt{ff}}
+
+
+	\newcommand{\Forw}{\mbox{\sc Forward}}
+
+	\newcommand{\Nat}{\mathds{N}}
+	\newcommand{\Rat}{\mathds{Q}}
+	\newcommand{\Qpos}{\Rat^{\geq 0}}
+	\newcommand{\Real}{\mathds{R}}
+	\newcommand{\Whole}{\mathds{Z}}
+
+	\newcommand{\Prot}{\mbox{\sc Prot}}
+	\newcommand{\score}{\mbox{\sc Score}}
+
+
+	\newcommand{\osigma}{\overline{\sigma}}
+
+	\newcommand{\used}{\eta}
+	\newcommand{\usedb}{\kappa}
+
+	\newcommand{\PO}{Player~$1$\xspace}
+	\newcommand{\PT}{Player~$2$\xspace}
+	\newcommand{\PR}{Player~$3$\xspace}
+	\newcommand{\PF}{Player~$4$\xspace}
+
+	\newcommand{\start}{\mbox{start}\xspace}
+	\newcommand{\eend}{\mbox{end}\xspace}
+
+	\newcommand\Mycomb[2][n]{\prescript{#1\mkern-0.5mu}{}C_{#2}}
+
+
+	\newtheorem{theorem}{Theorem}[section]
+	\newtheorem{proposition}[theorem]{Proposition}
+	\newtheorem{property}[theorem]{Property}
+	\newtheorem{corollary}[theorem]{Corollary}
+	\newtheorem{observation}[theorem]{Observation}
+	\newtheorem{lemma}[theorem]{Lemma}
+	\newtheorem{claim}[theorem]{Claim}
+	\newtheorem{fact}[theorem]{Fact}
+	\newtheorem{definition}{Definition}[section]
+	\newtheorem{algorithm}{Algorithm}[section]
+	%%\theoremstyle{definition}
+	%\newtheorem{example}{Example}[section]
+	\newtheorem{rmrk}[theorem]{Remark}
+	\newtheorem{exmpl}[theorem]{Example}
+	\newenvironment{remark}{\begin{rmrk}\rm}{\hspace{\stretch{1}}\end{rmrk}}
+	\newenvironment{example}{\begin{exmpl}\rm}{\hspace{\stretch{1}}\end{exmpl}}
+
+	\def\eod{\vrule height 6pt width 5pt depth 0pt}
+	\newenvironment{proof}{\noindent {\bf Proof:} \hspace{.677em}}
+	                      {\hspace*{\fill}{\eod}}
+
+
+
+	\begin{document}
+\section{Preliminaries}
+	We model a network as a directed\footnote{We choose a directed graph rather than undirected graph for ease of notation.} graph $\N = \zug{V, E}$.
+	%For an edge $e = \zug{u,v} \in E$, we use $s(e)$ to denote its source $u$, and $t(e)$ to denote its target $v$.
+	For a vertex $v \in V$, we use $out(v) \subseteq E$ to denote the set of outgoing edges from $v$, thus $out(v) = \set{\zug{v, u} \in E}$. A collection $\M$ of messages are sent through the network.
+	Each message $m \in \M$ has a source and a target vertex, which we refer to as $s(m)$ and $t(m)$, respectively. There is a global timeout $t \in \N$ and a message meets the timeout if it arrives in its destination by time $t$.
+
+
+
+	\subsection*{Forwarding messages}
+		Forwarding through the network in done using a {\em forwarding scheme}, which has three components. The first component is a {\em forwarding algorithm} that the switches run. Such an algorithm gets the messages in a switch's queue as well as the available edges, and returns, for each outgoing edge, the message that is forwarded on that edge, where it is possible that no message is forwarded. The algorithm is simple as we assume the switch's computation power is limited. All switches run the same algorithm. To allow variability, we add two other components to the forwarding scheme; each switch has an order on messages, which can be thought of as priorities on messages, and each message has, for each switch, an ordering on the outgoing edges from that switch, which can be thought of as a preference on edges.  
+
+		Formally, a forwarding algorithm is a collection of propositional rules of the form $\varphi \rightarrow \Forw(m,e)$. We refer to $\varphi$ as the assertion of the rule and its syntax is as follows
+		\[\varphi \ ::= \ m \ | \ e \ | \  m_1 < m_2 \ | \ e_1 <_m e_2  \ | \ \varphi \vee \varphi \ | \ \neg \varphi
+		\]
+		The algorithm is executed in all vertices. It is accompanied with two total orderings; for every vertex $v \in V$ there is an order $\prec_\M \subseteq \M \times \M$ on messages and, for every message $m \in \M$ and vertex $v \in V$ there is a total order $\prec_m^v \subseteq E \times E$ on (possibly a subset) of outgoing edges from $v$. 
+
+		The input to the algorithm, when it is run at a vertex $v$, is the set of messages in $v$'s queue as well as the outgoing edges of $v$ that are active. Thus, the semantics of an assertion $\varphi$ is respect to a set of messages $M \subseteq \M$ (the messages in the queue) and a set of edges $T \subseteq E$ (the active edges). Consider a rule $\varphi \rightarrow \Forw(m,e)$. We denote by $(M, T) \models_{\prec_v, \set{\prec_m^v}_{m \in \M}} \varphi$ the fact that $(M,T)$ satisfies $\varphi$, thus $m$ is forwarded on $e$. When $\prec_v$ and $\prec_m^v$ are clear from the context, we omit them. The semantics is defined recursively on the structure of $\varphi$. For the base cases, we have $(M, T) \models m$ iff $m \in M$, thus $m$ is in $v$'s queue, we have $(M,T) \models e$ iff $e \in T$, thus $e$ is active, we have $(M,T) \models (m_1 < m_2)$ iff $m_1 \prec_v m_2$, thus $m_1$ has precedence over $m_2$ in $v$, and we have $(M,T) \models (e_1 <_m e_2)$ iff $e_1 \prec_m^v e_2$, thus $m$ prefers being forwarded on $e_1$ at $v$ rather than on $e_2$. The inductive cases are as expected. Note that we allow $\prec_m^v$ to be defined on a subset of outgoing edges from $v$. For an edge $e$ for which $\prec_m^v$ is not defined, we have $(M,T) \not \models (e <_m e')$ and $(M,T) \not \models (e' <_m e)$, for every $M, T$, and $e'$. 
+
+		It is sometimes convenient to use definitions of sets in an algorithm as we illustrate in the examples below. A definition of a set is either a collection of messages or a collection of edges that satisfy an assertion as in the above. We also allow set operations like union, intersection, and difference, for sets over the same types of elements. 
+
+		The algorithm forwards messages on active links. We think of its output as pairs $O \subseteq \M \times E$, where $\zug{m, e} \in O$ implies that the algorithm forwards $m$ on $e$. We require that the algorithm obey the constraints of the network; at most one message is forwarded on a link, messages are forwarded only on active links, messages originate only from their source switch, they are forwarded only after they are received, and they are not forwarded from their destination.
+
+
+
+
+	\begin{example} {\bf Fallback}
+	\label{ex:fallback}
+		In some networks, a message has a high priority path with fall back paths (similar to the two-path protocol that is described in \cite{emsoft}). It prefers being forwarded on its priority path over the fall-back paths even if it means that it has to wait for other messages of higher priority to be sent earlier. We describe an algorithm for such networks. Consider a vertex $v$, let $M$ be the set of messages in $v$'s queue, and let $T \subseteq out(v)$ be the active edges. For every edge $e \in T$, let $S_e \subseteq M$ be the messages whose first preference in $T$ is the edge $e$. We pick the message in $S_e$ of highest priority and forward it on $e$. The other messages stay in $v$'s queue.
+
+		We describe the algorithm formally. For a message $m \in \M$ and a set of messages $S \subseteq \M$, we describe an assertion $\mbox{priority}(m, S)$ that asserts that $m$ is in $S$ and it is the highest priority message in $S$. Formally, we have $\mbox{priority}(m, S) = m\in S \wedge \bigwedge_{m' \in \M} m' \in S \rightarrow (m' \prec_v m)$. Also, for a message $m \in M$, an edge $e \in out(v)$, and a set of edges $T \subseteq out(v)$, we describe an assertion $\mbox{prefers}(v, e, T)$ that asserts that $e$ is the highest preference of $m$ out of the edges in $T$. Formally, we have $\mbox{prefers}(e, T) = \bigwedge_{e' \in out(v)} e' \in T \rightarrow (e' \prec_m^v e)$. 
+
+		For every $e \in out(v)$, we define the set of messages $S_e$ that prefer $e$ from the active edges, thus $S_e = \set{m :  \mbox{prefers}(e, T)}$. Now, for every active edge $e \in T$, we forward the highest priority message in $S_e$ on $e$, thus, for every message $m \in \M$, we have $e \wedge \mbox{priority}(m, S_e) \rightarrow \Forw(m, e)$.
+		\end{example}
+	\begin{example}	{\bf Hot-potato} 
+	\label{ex:hot-potato}
+		In some networks, the size of switches' queues is limited, and switches use a ``hot-potato'' like forwarding algorithm. A switch forwards incoming messages as soon as they arrive while using links that are possibly not the messages' first-choice link, keeping the queue as empty as possible. We describe an algorithm for such networks. Consider a vertex $v$, let $M$ be the set of messages in $v$'s queue, where their order in increasing priority is $m_{|M|} \prec_v \ldots \prec_v m_1$, and $T \subseteq out(v)$ is the set of active edges. We iterate over the messages in $M$ in decreasing priority, allowing each message to choose its highest priority edge that is active and not taken. That is, $m_1$ chooses its highest priority edge $e_1$ in $T$, thus for every other edge $e \in T$, we have $e \prec_m^v e_1$. Next, $m_2$ chooses its highest priority edge $e_2 \in T \setminus \set{e_1}$, and so forth. If a message is left with no outgoing edge with some priority, it stays in $v$'s queue. 
+
+		We describe the algorithm formally.  Recall the two assertions $\mbox{prefers}(m, e, T)$ and $\mbox{priority}(m, S)$ from the previous example. We define sets of messages $S_1 \supseteq S_2 \supseteq \ldots \supseteq S_{|\M|}$, where $S_1 = M$, and for $1 < i \leq |\M|$, we have $S_i = S_{i-1} \setminus \set{m :\mbox{priority}(m, S_i)}$. Note that the $S_{|M|}$ is a singleton and the sets $S_{|M|+1}, \ldots, S_{|\M|}$ are empty. Now, we define a sequence of $|out(v)|$ sets of edges $T_1 \supseteq \ldots \supseteq T_{|out(v)|}$. Intuitively, the set $T_i$ is the set of edges that are available for the message of priority $i$. Thus, we have $T_1 = T$ and, for $1 < i \leq |out(v)|$, we have $T_i = T_{i-1} \setminus \set{e: \mbox{priority}(m, S_i) \wedge \mbox{prefers}(m, e, T_i)}$. Finally, for every $m \in \M$, $e \in out(v)$, and $1 \leq i \leq |M|-1$, if $m$ is the highest priority message in $S_i$ forward it on its highest priority edge in $T_i$.  Formally, we have, for every $m \in \M$ and $e \in out(v)$, a rule $\mbox{priority}(m, S_i) \wedge \mbox{prefers}(e, T_i) \rightarrow \Forw(m, e)$.
+		\end{example}
+
+
+
+
+
+
+
+	\subsection*{Faults and Outcomes}
+		We consider two types of faults. The first type are crashes of edges. The simplest type of faults are {\em edge crashes}; once an edge crashes it does not recover. A slightly stronger fault model is {\em temporary crashes} in which an edge is allowed to recover from a crash. A second type of fault model we consider are faults on sent messages. We consider {\em omissions} in which a sent message can be lost. We assume the switches detect such omissions. We model these faults as a sent message that does not reach its destination and re-appears in the sending switch's queue. 
+		Finally, we consider {\em delayed messages} in which a sent message does not appear in the target switch on the following time step, rather it appears in a later time. We focus on crashes and omissions and it is not hard to adjust the definitions below to include the other two faults as well.
+
+		The outcome of a network is a sequence of {\em snapshots} of the network at each time point. Each snapshot, which we refer to as a {\em configuration}, includes the positions of all the messages, thus it is a set of $|\M|$ pairs of the form $\zug{m,v}$, meaning that $m$ is on vertex $v$ in the configuration. All outcomes have $t+1$ configurations and they all start from the same initial configuration $\set{\zug{m, s(m)}: m \in \M}$ in which all messages are at their origin. Consider a configuration $C$. Defining the next configuration $C'$ in the outcome is done in two steps. Let $T \subseteq E$ be the active edges, and fix a  forwarding scheme. In the first step, we run the forwarding scheme. Recall that the input to the forwarding algorithm at a vertex $v$ is the set of messages $M$ in $v$'s queue, i.e., $M = \set{m: \zug{m,v} \in C}$, as well as the active outgoing edges from $v$, i.e., $out(v) \cap T$. The forwarding algorithm keeps some of the messages $S \subseteq M$ in $v$'s queue and forwards others. The messages in $S$ stay in $v$'s queue, thus we have $\zug{m,v} \in C'$ for every message $m\in S$. Recall that the algorithm's output is $O \subseteq (\M \times E)$, where $\zug{m, e} \in O$ means that $m$ is forwarded on the link $e$. In the second step, we allow omissions to occur on the pairs in $O$. If an omission occurs on $\zug{m, \zug{v,u}} \in O$, then $m$ returns to the source of the edge and we have $\zug{m,v} \in C'$. 
+
+		We consider probabilistic failures and assume that faults occur independently. We assume there is a probability $p_{crash}$ that an edge crashes as well as a probability $p_{omit}$ that a forwarded message is omitted. Consider a set of active edges $T$. The probability that the active edges in the next time step is $T' \subseteq T$ is the probability that all the edges in $T'$ stay active, i.e., $(1-p_{crash})^{|T'|}$, multiplied by the probability that the edges in $T \setminus T'$ crash, i.e., $p_{crash}^{|T \setminus T'|}$. We define omissions similarly. Consider a configuration $C$, active edges $T$, and let $O$ be the output of the algorithm. The probability that an omission occurs to a pair in $O$ is $p_{omit}$. 
+
+		\begin{definition}
+		The score of a forwarding scheme is the probability that all messages arrive on time.
+		\end{definition}
+
+
+
+
+
+\section{A Counting Method}
+\label{sec:counting}
+	We suggest a method for calculating the score of a forwarding scheme in a network that relies on counting the number of satisfying assignments of an SAT program. A satisfying assignment to the SAT program corresponds to a sequence of faults as well as the resulting outcome of the network. Moreover, a satisfying assignment corresponds to an outcome in which some messages {\em do not} arrive at their destination. A naive approach to calculate the score of the forwarding scheme would be to iteratively find a satisfying assignment to the program, calculate the probability of the corresponding outcome, and add a constraint to the program that ensures that the same assignment is not found again. Summing up over all satisfying assignments gives the probability of the outcomes in which not all messages arrive. Subtracting from $1$ gives us the score of the forwarding scheme. However, this algorithm is clearly infeasible. We suggest several approaches that use the bulk of work on counting and approximated counting of satisfying assignments to calculate the score and approximated score of a forwarding scheme. Before doing so, we elaborate on the SAT program.
+
+	\begin{theorem}
+	\label{thm:fault seq}
+	Given a network and a forwarding scheme, we construct an SAT program for which there is a one-to-one correspondence between satisfying assignments, and faults and outcomes in which not all messages arrive on time.
+	\end{theorem}
+	\begin{proof}
+	...
+	\end{proof}
+
+
+
+
+	\subsection{Weighted model counting}
+		\label{sec:WMC}
+		The first technique we describe is used to find an exact score. It builds on the framework of \cite{CFMV15}.
+		\stam{
+		@inproceedings{CFMV15,
+		  author    = {Supratik Chakraborty and
+		               Dror Fried and
+		               Kuldeep S. Meel and
+		               Moshe Y. Vardi},
+		  title     = {From Weighted to Unweighted Model Counting},
+		  booktitle = {Proceedings of the Twenty-Fourth International Joint Conference on
+		               Artificial Intelligence, {IJCAI} 2015, Buenos Aires, Argentina, July
+		               25-31, 2015},
+		  pages     = {689--695},
+		  year      = {2015},
+		}
+		}
+		In weighted model counting (WMC, for short), the input formula $\varphi$ is accompanied with a weight function $w$ that assigns to each satisfying assignment a probability. The goal is to calculate the probability of the satisfying assignments, which we denote by $score(\varphi)$. Formally, let $SAT(\varphi)$ be the set of satisfying assignments to $\varphi$. Then, $score(\varphi) = \sum_{SAT(\varphi)} w(\sigma)$. In \cite{CFMV15}, the authors identify a special type of weight functions in which each literal has a probability of getting value true. The literals are independent, so the weight of an assignment is the product of the literals' probabilities. Accordingly, they call this fragment {\em literal-weighted} WMC. Formally, we have a probability function $Pr(\ell)$, for every literal $\ell$ in $\varphi$. We define $score(\sigma) = \prod_{\ell: \sigma(\ell) = \tt} Pr(\ell) \cdot \prod_{\ell: \sigma(\ell) = \ff} (1-Pr(\ell))$, and $score(\varphi) = \sum_{\sigma \in SAT(\varphi)} score(\sigma)$.
+
+		We show how to reduce the scoring problem to literal-weighted WMC.
+		\begin{theorem}
+		\label{thm:literal WMC}
+		Given a network and a forwarding scheme $\S$, there is a literal-weighted WMC $\zug{\varphi, w}$ such that the score of $\S$ equals the $score(\varphi)$.
+		\end{theorem}
+		\begin{proof}
+		...
+		\end{proof}
+
+		Next, we use the reduction from literal-weight WMC to un-weighted model counting as described in \cite{CFMV15}. This allows us to reduce the problem of finding the score of a forwarding scheme to counting satisfying assignments of a SAT formula.
+
+
+
+
+
+	\subsection{Iterative approach}
+		\label{sec:Iterative}
+		Recall the naive algorithm to calculate score that is described in the beginning of this section in which we iteratively find a satisfying assignment, calculate its probability, and add a constraint to prevent it being found again. In practice, the probability of a fault is very small. Thus, the satisfying assignments that include many faults have negligible probability. We take advantage of this observation and study an approach in which we find an approximate score of a forwarding scheme in an iterative manner. We start with a very coarse score and improve it. We focus on edge crashes. In each iteration we allow exactly $k$ crashes. Calculating the probability of all outcomes with $k$ crashes is not hard. We find the probability of the ``bad outcomes'' with $k$ crashes, namely outcomes in which at least one message misses the timeout, and deduct from the total probability. Thus, we have the probability of the ``good outcomes'' with $k$ crashes, and we add that to the score of the scheme. Also, we maintain an {\em uncertainty gap}, which is initialized to $1$, and in each iteration we deduct the probability of all outcomes with $k$ crashes. When the uncertainty gap is sufficiently small, we terminate. We describe the pseudo code of the approach below.
+
+
+		\begin{center}
+		\begin{algorithmic}
+		\algnotext{EndIf}
+		\algnotext{EndWhile}
+		\Require A network $\N=\zug{V, E}$, a set of messages $\M$, a forwarding scheme $\S$, a timeout $t$, the probability of a crash $p_{crash}$, and $\epsilon > 0$.
+
+		\Ensure An additive $\epsilon$-approximation on the score of $\S$ 
+
+		\State $uncertainty = 1, score=0, k=0$.
+		\While{$uncertainty > \epsilon$}
+		\State $all \gets {|E| \choose k} \cdot (1-p)^{(|E|-k) \cdot t} \cdot (1 - (1-p)^t)^k$
+		\State $bad \gets \Call{CalcBadProb}{\N, \M, \S, t, k}$
+		\State $uncertainty \ -\!= \ all; \ score \ +\!= \  (all-bad);\ k\ +\!+;$
+		\EndWhile
+		\State \Return $score$
+		\end{algorithmic}
+		\end{center}
+
+		\begin{lemma}
+		\label{lem:calc-prob}
+		The probability of all outputs with exactly $k$ crashes is ${|E| \choose k} \cdot (1-p)^{(|E|-k) \cdot t} \cdot (1 - (1-p)^t)^k$.
+		\end{lemma}
+		\begin{proof}
+		We first choose the $k$ edges that crash. The probability that the other edges do not crash is $(1-p)^{(|E|-k) \cdot t}$. The probability that an edge does not crash is $(1-p)^t$. Thus, the probability that it crashes at some time is $(1-(1-p)^t)$, and we take the product for the $k$ edges that do crash.
+		\end{proof}
+
+
+
+
+		The method {\sc CalcBadProb} calculates the probability of the outcomes with exactly $k$ crashes in which at least one message misses the timeout. We use a weighted counting approach as defined in Section~\ref{sec:counting}, but not weighted-literal WMC as we used there. We take advantage of the fact that the solution space is reduced significantly, thus counting is faster. More importantly, we use the fact that the probabilities of the outcomes do not vary too much. This allows us to use the method of \cite{..} for WMC. The running time of the method depends on a given estimation of the ratio between the weight of the maximal weighted satisfying assignment and the minimal weighted one, which the authors refer to as the {\em tilt}. We start by bounding the tilt.
+		\begin{lemma}
+		\label{lem:tilt}
+		$tilt \leq (1-p_{crash})^{k \cdot t}$.
+		\end{lemma}
+		\begin{proof}
+		(DRAFT) Note that the probability of an outcome with a crash at time $i$ is greater than the probability of the same outcome only with the crash occurring at time $i+1$. Indeed, in the second outcome, the edge has to ``survive'' the $i$-th time slot, thus the probability of the outcomes differ by a factor of $(1-p_{crash})$. Thus, having all crashes occur at time $0$ is an upper bound on the bad outcome with highest probability. Similarly, having all crashes occur at time $t$ is a lower bound on the minimal-weighted outcome. Since all other edges do not crash, we have that $tilt \leq (1-p_{crash})^{k \cdot (t-1)}$.
+		\end{proof}
+
+		Finally, we need to add a constraints to the program in Theorem~\ref{thm:fault seq} that ensure that exactly $k$ crashes occur. Recall that the program includes crash-variables of the form $x_{e,i}$, for every $e \in E$ and $0 \leq i <t$, and assigning $\tt$ to $x_{e,i}$ means that edge $e$ crashes at time $i$. We need to count the number of crashes and ensure that they equal $k$. One way of doing it would be to view these variables as getting values in $\set{0,1}$ and adding the constraint $\sum_{e \in E} x_{e,t-1} = k$ (recall that once an edge crashes it does not recover). But, this is an SMT constraint. While there has been work on counting SMT formulas \cite{CDM15}, the literature on counting SAT formulas overshadows it. We suggest a different approach that intuitively simulates a Boolean circuit that simulates the SMT constraint above.
+
+		\begin{lemma}
+		\label{lem:k crash sat}
+		There is a SAT formula that is satisfiable iff exactly $k$ crashes occur. 
+		\end{lemma}
+		\begin{proof}
+		(DRAFT) Intuitively, we simulate an execution of circuit that sums the number of variables that get a true value.
+		\end{proof}
+
+
+
+
+\section{A Monte-Carlo Approach}
+\label{sec:monte-carlo}
+	The Monte-Carlo approach is very simple yet it performs quite well in practice as we elaborate in Section~\ref{sec:eval}. We run a probabilistic simulation of the network for $n$ times, where $n$ is a large number which we choose later. In each simulation, we start from the initial configuration. At each iteration we probabilistically choose the failing edges in the iteration. We run the forwarding scheme and get the edges on which messages are forwarded. We again choose probabilistically the edges on which omissions occur. This gives us the next configuration. We repeat the process for $t$ times and end up with the final configuration. If all messages arrive, we list the experiment as $1$, and otherwise as $0$. We use $y_1, \ldots, y_n$ to refer to the outcomes of the experiments, thus $y_i \in \set{0,1}$. Let $m$ be the number of successful experiments. We return $m/n$. We use Hoeffding's inequality to bound the error \[\Pr[\frac{1}{n}\sum_{i=1}^n y_i - \score(\S) \geq \epsilon] \leq e^{-2n\epsilon^2}\]
+
+
+
+
+
+\section{Computational complexity}
+	We study the computational complexity of finding the score of a forwarding scheme. We study the decision-problem variant in which the input includes a threshold on the score. We show that the problem is in PSPACE and it is NP-hard. For the upper bound, we show that scoring can be reduced to counting a polynomial-sized SAT formula (similar to the reduction in Theorem~\ref{thm:literal WMC}), thus the problem is in $P^{\#P}$ and in turn in PSPACE. For the lower bound, we first study the complexity of the adversarial case, which was not studied in \cite{AGN16}. We consider the problem of deciding the existence of a ``bad'' fault sequence. Formally, we consider the problem of deciding whether there is a set of edges of size at most $k$ that all crash at time $0$ and guarantee that less than $\ell$ messages arrive on time. We show that the problem is NP-Complete. We then use the reduction in the probabilistic setting to show NP-hardness of the scoring problem.
+
+\section{Evaluation}
+	\label{sec:eval}
+	We have implemented Weighted Model Counting, Iterative approach and the Monte-Carlo Approach for scoring forwarding schemes, which are described in Section~\ref{sec:counting} and~\ref{sec:monte-carlo}. Our implementations are in Python and rely on counting tools - both unweighted (sharp-Sat \cite{sharpSat}, cryptominsat \cite{cryptominsat}) and weighted (WeightMC \cite{WeightMC}). We ran our experiments on a personal computer, Intel Core i3 quad core 3.40 GHz processor, with 8 GB memory.
+
+	\noindent{\bf Network and {\em forwarding scheme} generation}
+		We evaluate the algorithm on networks that were generated randomly by the Python library Networkx
+		 \cite{HSS08}.
+		The networks are generated in the following manner.
+		We fix the number of vertices, edges, and messages.
+		We generate a random directed graph.
+		%We consider relatively dense graphs, where % This may not be considered dense.
+		%The number of edges ranges from $1.2$ to $1.5$ times the number of vertices.
+		We consider relatively dense graphs, where the number of edges are approximately 2 times the number of vertices.
+		Once we have a graph, we randomly select a source and a target for each message,
+		while guaranteeing that these are different nodes.
+		We refer to a graph and messages with the source and the target vertices, 
+		as the {\em setting}.
+		For each setting, the {\em forwarding scheme} is generated deterministically.
+
+		We find the edge priorities for each message and message priorities for each vertex. We note that the problem of finding ``good'' priorities is a crucial component of the protocol. It is a challenging problem both theoretically and practically, and it is out of the scope of this paper. We now describe the edge priority-finding algorithm used. We start with a simple approach.
+
+		Consider a message $m \in \M$. Recall that $s(m)$ and $t(m)$ denote the source vertex
+		and the target vertex of message $m$, respectively. For finding the edge priorities at different vertices, we find first and second paths for the message $m$. For all edges outgoing from vertex $v$, an edge in the first path will have higher priority than one in the second path. If $v$ doesn't lie on any of the first of second paths, $m$ cannot be forwarded from $v$.
+		The first path is the shortest path between $s(m)$ and $t(m)$.
+		To find the second path, we remove the edges that the first path traverses.
+		For each vertex $v$ on the first path,
+		we set the second path from $v$ to be the shortest path from $v$ to $t(m)$ in the new graph, if it exists. 
+		The problem with this simple approach is that the second paths are of similar lengths for the different messages, making it hard to calculate the {\em Score}. Thus, we improve the approach by, intuitively, having messages avoid heavily loaded edges when selecting the two paths. Technically, the graph is now weighted. The weight of an edge refers to the number of times it appears in a first or second path. We construct the weights in the graph incrementally. The weights start from $0$. We order the messages arbitrarily and choose them one by one. When a message is chosen, it selects its first and second paths similarly to the above (only running Dijkstra's algorithm rather than a BFS for finding shortest paths). The weight of every edge on the first and second path is incremented by $1$.
+
+		Next, we decide message priorities for each vertex arbitrarily.
+		% Upon implementing different heuristics for deciding message priorities, we notice that different heuristics result in different {\em Scores}. For the purpose of evaluation, we use the {\em longest path first} heuristic where a message with a longer first path has higher priority than those with shorter paths. 
+		As a last step before finding the {\em Score}, we need to decide the {\em forwarding algorithm}. Though both {\em Hot-Potato} and {\em Fallback} approaches have been implemented, all results displayed have been obtained using the {\em Hot-Potato} approach, which is described in Example~\ref{ex:hot-potato}. 
+
+	\noindent{\bf Execution time measurements}
+		We elaborate on the different approaches for scoring the {\em forwarding scheme} generated above and show corresponding run times obtained using settings ranging from 4 nodes to 45 nodes. Each setting contains a relatively dense graph, with number of edges being 2 times the number of nodes, the timeout and number of messages equalling the number of nodes. Both the fault probabilities $pr_{\text{crashes}}$ and $pr_{\text{omission}}$ are set to $0.01$ for thepurposes of this evaluation. All results have been averaged over 3-5 runs. Each program times out after 1 hour, returning ``Timeout'' if it has not terminated by then.
+
+		{\bf WMC}: 
+			For WMC in Section~\ref{sec:WMC}, we reduce the SAT program generated in Theorem~\ref{thm:fault seq} to literal-weighted WMC using Theorem~\ref{thm:literal WMC}, and further to an Unweighted Model Counting (UMC, for short) formula \varphi, as described in \cite{Weightd to Unweighted}. Though the reduction in Theorem~\ref{thm:literal WMC} leads to the exact computation of the {\em Score} theoretically, while implementing, we must truncate the weights $w$ to a particular bit {\em precision} because the size of the reduced formula increases with the size of the binary representation of $w$. For similar reasons, we also need to truncate the $1/(2-w)$ term in the Proof of Theorem~\ref{thm:literal WMC} to {\em precision} bits. These truncations lead to errors in the {\em Score}, the magnitude depending on both - the {\em precision} and the {\em Setting}.
+			Recall that $SAT(\varphi)$ is the set of satisfying assignments to \varphi. Let the size of $SAT(\varphi)$ be $\#\varphi$. The {\em Score} equals $\#\varphi$, after normalization. $\#\varphi$ can be calculated using exact counting tools like {\em sharp-Sat} \cite{sharpSAT} and approximate counting tools like {\em cryptominsat} \cite{cryptominsat} and {\em approxMC} \cite{approxMC}. One would expect approximation tools to perform much better than exact counting tools. However, sharp-Sat performs much better than cryptominsat and approxMC, which didn't terminate even for small settings with 5 nodes. The authors of \cite{approxMC} also confirmed this observation in \cite{this}%http://www.cs.rice.edu/~kgm2/Papers/ijcai15.pdf
+			. Note that the performance of the WMC method is very dependent upon the SAT counter that is used for calculating $\#\varphi$. Hence, the WMC method cannot be used for large problem sizes because of limitations of sharp-SAT. Future improvements in SAT counting tools will improve the performance of WMC.
+
+			Figure 1 shows the processing and counting times for WMC with a precision of 10 bits. All counting has been done using sharp-SAT.
+
+			{\bf Figure 1 comes here}
+
+		{\bf Iterative Approach}: 
+			We breifly explain the implementation of the $CalcBadProb$ method described in Section~\ref{sec:Iterative}. First, it generates a SAT formula using Theorem~\ref{thm:fault seq} and Lemma~\ref{lem:calc-prob}, and reduces it to literal-weighted WMC using Theorem~\ref{thm:literal WMC}. The weight of this literal-weighted WMC (after normalization) is to be returned, and is approximated using \cite{WeightGen}. By Lemma~\ref{lem:tilt} and \cite{WeightGen}, we know that the approximation obtained is reasonable.
+
+			In an alternate implementation of the {\em CalcBadProb} method, we generate an SMT formula $\varphi$ using Theorem~\ref{thm:fault seq} and add the SMT constraint that exactly k crashes occur. We use Z3 \cite{Z3} for solving this formula. Then, we iteratively find a solution $\sigma$ to $\varphi$, add $\neg \sigma$ back to $\varphi$ as a constraint and repeat this process until $\varphi$ is UNSAT. We return the sum of probabilities of the solutions $\sigma$ obtained in the iterations. This is a very naive counting method. We try optimizing it using an optimization described in the previous paper, where it worked very well.
+
+			Figure 2 shows the processing and counting times for various implementations of the Iterative approach for different values of k. We use an uncertainity of $0.01$. Note that this approach focusses only on crash faults and assumes $pr_{omission}=0$.
+
+			{\bf Figure 2 comes here}
+
+		{\bf Monte-Carlo}: 
+			The Monte-Carlo approach, which is described in Section~\ref{sec:monte-carlo} was also implemented in Python using randomization functions from the numpy \cite{numpy} library. We used the Hoeffding's Inequality \cite{hoeffding} to calculate the number of iterations needed to acheive the desired error and confidence levels. We also tried to improve the run time by using multiprocessing. We evaluated the Monte Carlo approach using an error $\epsilon=0.01$, and a confidence of $\delta=0.99$. We used 4 threads for the multiprocessing variant of Monte-Carlo approach. We choose this number after comparing the run times of the threaded approach  with different number of threads. The run times obtained for the threaded and linear programs are shown in Figure 3.
+
+			{\bf Figure 3 comes here}
+
+	\noindent{\bf Observations}
+	Upon comparing Figures 1, 2 and 3, it seems that the Iterative approach scales better than WMC. However, the probability bounds provided by the Iterative approach are very loose for large Networks. We see that the WMC approach works very well for small settings consisting of upto 7 nodes. For settings larger than this, the Monte-Carlo approach works the best. Figure 4 combines the results in Figures 1-3, and gives a clear idea of the relative run times of the WMC, Iterative approaches and the Monte-Carlo approach. 
+
+
+
+\end{document}
+	\section{Remarks}
+	\begin{itemize}
+	\item Partial synthesis
+	\item Formalize an assumption we need to make the polynomial algorithm work.
+	\end{itemize}
+
+
+	Choosing the correct orderings is a challenging task that can greatly affect the performance of the network. Here, we assume that the forwarding algorithm as well as the edge ordering are predefined. Our goal is to find a ``good'' message priority as we formalize below. This approach is similar to the approach taken in \cite{AGN16} yak yak. 
+
+
+
+	\stam{
+	The literature on counting SAT formulas overshadows the work on counting SMT formulas \cite{CDM15}. We suggest different approaches to alter the program above to a SAT program and use the work that has been done there.
+	\stam{
+	@inproceedings{CDM15,
+	  author    = {Dmitry Chistikov and
+	               Rayna Dimitrova and
+	               Rupak Majumdar},
+	  title     = {Approximate Counting in {SMT} and Value Estimation for Probabilistic
+	               Programs},
+	  booktitle = {Tools and Algorithms for the Construction and Analysis of Systems
+	               - 21st International Conference, {TACAS} 2015, Held as Part of the
+	               European Joint Conferences on Theory and Practice of Software, {ETAPS}
+	               2015, London, UK, April 11-18, 2015. Proceedings},
+	  pages     = {320--334},
+	  year      = {2015},
+	}
+	}
+	}
+
+
+
+	\end{document}
