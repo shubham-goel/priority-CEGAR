@@ -1,4 +1,4 @@
-\documentclass{sig-alternate}[9pt]
+\documentclass{sig-alternate-05-2015}[9pt]
 
 	\usepackage{times}
 	\usepackage{amssymb}
@@ -145,230 +145,65 @@
 
 
 \section{evaluation}
-	% We have implemented the CEGAR loop for finding a $(k,\ell)$-resistant schedule, which is described in Section~\ref{sec:CEGAR}, assuming that the switches run the two-path protocol. Our implementation is in Python and relies on Z3 \cite{MB08} as an SMT solver. We ran our experiments on a personal computer, Intel Core i3 quad core 3.40 GHz processor, with 8 GB memory.
+	We have implemented Weighted Model Counting, Iterative approach and the Monte-Carlo Approach for scoring forwarding schemes, which are described in Sections 2 and 3. Our implementations are in Python and rely on counting tools - both unweighted (sharp-Sat \cite{sharpSat}, cryptominsat \cite{cryptominsat}) and weighted (WeightMC \cite{WeightMC}). We ran our experiments on a personal computer, Intel Core i3 quad core 3.40 GHz processor, with 8 GB memory.
 
-	We have implemented Weighted Model Counting, Iterative approach and the Monte-Carlo Approach for scoring forwarding schemes, which are described in Section 2 and Section 3. Our implementations are in Python and rely on counting tools, both unweighted (sharp-Sat, cryptominsat) and weighted (WeightMC). We ran our experiments on a personal computer, Intel Core i3 quad core 3.40 GHz processor, with 8 GB memory.
 	\noindent{\bf Network and {\em forwarding scheme} generation}
 		We evaluate the algorithm on networks that were generated randomly by the Python library Networkx
 		 \cite{HSS08}.
 		The networks are generated in the following manner.
 		We fix the number of vertices, edges, and messages.
 		We generate a random directed graph.
-		%We consider relatively dense graphs, where  % This may not be considered dense.
+		%We consider relatively dense graphs, where % This may not be considered dense.
 		%The number of edges ranges from $1.2$ to $1.5$ times the number of vertices.
 		We consider relatively dense graphs, where the number of edges are approximately 2 times the number of vertices.
 		Once we have a graph, we randomly select a source and a target for each message,
 		while guaranteeing that these are different nodes.
 		We refer to a graph and messages with the source and the target vertices, 
 		as the {\em setting}.
-		The {\em forwarding scheme} is generated for a setting deterministically.
+		For each setting, the {\em forwarding scheme} is generated deterministically.
 
-		We find the edge priorities for each message. We note that the problem of finding ``good'' edge priorities is a crucial component of the protocol. It is a challenging problem both theoretically and practically, and it is out of the scope of this paper. We now describe the edge priority-finding algorithm we use. We start with a simple approach.
+		We find the edge priorities for each message and message priorities for each vertex. We note that the problem of finding ``good'' priorities is a crucial component of the protocol. It is a challenging problem both theoretically and practically, and it is out of the scope of this paper. We now describe the edge priority-finding algorithm used. We start with a simple approach.
 
 		Consider a message $m \in \M$. Recall that $s(m)$ and $t(m)$ denote the source vertex
-		and the target vertex of message $m$, respectively. For finding the edge priorities at different vertices, we find first and second paths for the message $m$. For all edges outgoing from vertex $v$, an edge in the first path will have higher priority than one in the second path. If $v$ doesn't  lie on any of the first of second paths, $m$ cannot be forwarded from $v$.
+		and the target vertex of message $m$, respectively. For finding the edge priorities at different vertices, we find first and second paths for the message $m$. For all edges outgoing from vertex $v$, an edge in the first path will have higher priority than one in the second path. If $v$ doesn't lie on any of the first of second paths, $m$ cannot be forwarded from $v$.
 		The first path is the shortest path between $s(m)$ and $t(m)$.
 		To find the second path, we remove the edges that the first path traverses.
 		For each vertex $v$ on the first path,
 		we set the second path from $v$ to be the shortest path from $v$ to $t(m)$ in the new graph, if it exists. 
-		The problem with this simple approach is that the second paths are of similar lengths for the different messages, making it hard to calculate the {\em Score}. Thus, we improve the approach by, intuitively, having messages avoid heavily loaded edges when selecting the two paths. Technically, the graph is now weighted. The weight of  an edge refers to the number of times it appears in a first or second path. We construct the weights in the graph incrementally. The weights start from $0$. We order the messages arbitrarily and choose them one by one. When a message is chosen, it selects its first and second paths similarly to the above (only running Dijkstra's algorithm rather than a BFS for finding shortest paths). The weight of every edge on the first and second path is incremented by $1$.
+		The problem with this simple approach is that the second paths are of similar lengths for the different messages, making it hard to calculate the {\em Score}. Thus, we improve the approach by, intuitively, having messages avoid heavily loaded edges when selecting the two paths. Technically, the graph is now weighted. The weight of an edge refers to the number of times it appears in a first or second path. We construct the weights in the graph incrementally. The weights start from $0$. We order the messages arbitrarily and choose them one by one. When a message is chosen, it selects its first and second paths similarly to the above (only running Dijkstra's algorithm rather than a BFS for finding shortest paths). The weight of every edge on the first and second path is incremented by $1$.
 
-% --------------------Parse  Pointer--------------------------
-		Next, we decide message priorities for each vertex. Upon implementing different heuristics for deciding message priorities, we see that different heuristics result in different $Scores$. For the purpose of evaluation, we use the {\em longest path first} where a message with a longer first path is prioritized first. 
-		As a last step before finding the {\em Score}, we need to decide the {\em forwarding algorithm}. Though both {\em Hot-Potato} and {\em Fallback} approaches have been implemented, we use the {\em Hot-Potato} approach, which is described in Example 1.2 
+		Next, we decide message priorities for each vertex. Upon implementing different heuristics for deciding message priorities, we notice that different heuristics result in different {\em Scores}. For the purpose of evaluation, we use the {\em longest path first} heuristic where a message with a longer first path has higher priority than those with shorter paths. 
+		As a last step before finding the {\em Score}, we need to decide the {\em forwarding algorithm}. Though both {\em Hot-Potato} and {\em Fallback} approaches have been implemented, all results displayed have been obtained using the {\em Hot-Potato} approach, which is described in Example 1.2. 
 
+	\noindent{\bf Execution time measurements}
+		We elaborate on the different approaches for scoring the {\em forwarding scheme} generated above and show corresponding run times obtained using settings ranging from 4 nodes to 45 nodes. Each setting contains a relatively dense graph, with number of edges being 2 times the number of nodes, the timeout and number of messages equalling the number of nodes. Both the fault probabilities $pr_{\text{crashes}}$ and $pr_{\text{omission}}$ are set to $0.01$ for thepurposes of this evaluation. All results have been averaged over 3-5 runs. Each program times out after 1 hour, returning ``Timeout'' if it has not terminated by then.
 
-	% \noindent{\bf Execution time measurements}
-	% 	%%% New -  Guillermo %%%%
-	% 	We elaborate on the pseudo-code that is described in Section~{sec:CEGAR}. An execution starts with an initialization phase (or \emph{Setup}), in which the method {\sc $\exists$Sched}, implementing the program described in Theorem~{thm:exists-schedule}, is called; followed by the iterative phase, which we refer to as the CEGAR loop.
-	% 	% which an iterative phase that concludes when a $(k,\ell)$-resistant schedule has been obtained or no such schedule exists. 
-	% 	Method {\sc $\exists$Sched} returns the initial schedule to be used in the CEGAR loop.
-	% 	An iteration starts with a call to the method {\sc IsResist}, which is an implementation of the program that is described in Theorem~{thm:worst-faults}. Method {\sc IsResist}$(S,k,\ell)$ returns $\tt$ and concludes the iterations if schedule $S$ is $(k,\ell)$-resistant, or otherwise it returns a fault sequence that witnesses the non-resistance of $S$. If the schedule is not $(k,\ell)$-resistant, the second method that is run in the CEGAR iteration is {\sc $\exists$SchedGivConf}, which implements the optimization that is described in Theorem~{thm:optimization}. A call to {\sc $\exists$SchedGivConf}$(F, C_i)$ returns $\tt$ if it is possible to recover from the configuration $C_i$, assuming the sequence of faults $F$ occurs. This check is performed for every time point $0 \leq i \leq t-1$ such that the $i$-constraint is not $\tt$. If for some time $i$, it finds that it is not possible to recover from $C_i$ then $\neg \psi^i$ is added to the SMT program. The iteration ends with a call to the SMT solver. If it is SAT, then we generate a schedule for the next iteration, whereas if it is UNSAT, we terminate and return that no $(k,\ell)$-resistant schedule exists.
+		{\bf WMC}: 
+		For WMC in Section 2.1, we reduce the SAT program generated in Theorem 2.1 to literal-weighted WMC using Theorem 2.2, and further to an Unweighted Model Counting (UMC, for short) formula \phi, as described in \cite{Weightd to Unweighted}. Though the reduction in Theorem 2.2 leads to the exact computation of the {\em Score} theoretically, while implementing, we must truncate the weights $w$ to a particular bit {\em precision} because the size of the reduced formula increases with the size of the binary representation of $w$. For similar reasons, we also need to truncate the $1/(2-w)$ term in the Proof of Theorem 2.2 to {\em precision} bits. These truncations lead to errors in the {\em Score}, the magnitude depending on both - the {\em precision} and the {\em Setting}.
+		Recall that $SAT(\phi)$ is the set of satisfying assignments to \phi. Let the size of $SAT(\phi)$ be $\#\phi$. The {\em Score} equals $\#\phi$, after normalization. $\#\phi$ can be calculated using exact counting tools like {\em sharp-Sat} \cite{sharpSAT} and approximate counting tools like {\em cryptominsat} \cite{cryptominsat} and {\em approxMC} \cite{approxMC}. One would expect approximation tools to perform much better than exact counting tools. However, sharp-Sat performs much better than cryptominsat and approxMC, which didn't terminate even for small settings with 5 nodes. The authors of \cite{approxMC} also confirmed this observation in \cite{this}%http://www.cs.rice.edu/~kgm2/Papers/ijcai15.pdf
+		. Note that the performance of the WMC method is very dependent upon the SAT counter that is used for calculating $\#\phi$. Hence, the WMC method cannot be used for large problem sizes because of limitations of sharp-SAT. Future improvements in SAT counting tools will improve the performance of WMC.
 
+		Figure 1 shows the processing and counting times for WMC with a precision of 10 bits. All counting has been done using sharp-SAT.
 
-	% 	Our goal in the implementation is to evaluate the performance of our CEGAR loop rather than focusing on scalability. In our experiments we considered small settings (S) with $30$ vertices, $50$ messages, $40$ edges, a timeout of $10$, and $\ell = 45$ while considering different values for $k$, and a larger setting (L) with $100$ vertices, $150$ messages, $200$ edges, a timeout of $12$, and $\ell=150$. For each setting, we measured three different aspects: the time needed for the Setup phase, the average time needed to execute one iteration and the average number of iterations required before finding a $(k,\ell)$-resistant schedule. The iteration execution times were measured first without applying the optimization, in what we call the Basic loop, and then with the optimization. Our intention was understanding the contributions in terms of execution time of the different methods of the approach and assess the improvement caused by the optimization.
+		{\bf Figure 1 comes here}
 
+		{\bf Iterative Approach}: 
+		We breifly explain the implementation of the $CalcBadProb$ method described in Section 2.2. First, it generates a SAT formula using Theorem 2.1 and Lemma 2.3, and reduces it to literal-weighted WMC using Theorem 2.2. The weight of this literal-weighted WMC (after normalization) is to be returned, and is approximated using \cite{WeightGen}. By Lemma 2.4 and \cite{WeightGen}, we know that the approximation obtained is reasonable.
 
-	% 	%So, we evaluated on relatively small networks to keep a low running time for the iterations.
+		In an alternate implementation of the {\em CalcBadProb} method, we generate an SMT formula $\phi$ using Theorem 2.1 and add the SMT constraint that exactly k crashes occur. Then, we iteratively find a solution $\sigma$ to $\phi$, add $\neg \sigma$ back to $\phi$ as a constraint and repeat this process until $\phi$ is UNSAT. We return the sum of probabilities of the solutions $\sigma$ obtained in the iterations. This is a very naive counting method. We try optimizing it using an optimization described in the previous paper, where it worked very well.
 
-	% 	%Since the running time of an iteration varies significantly we list in Table~{tab:time} the running times of the different components of the program. 
+		Figure 2 shows the processing and counting times for various implementations of the Iterative approach for different values of k. We use an uncertainity of $0.01$. Note that this approach focusses only on crash faults and assumes $pr_{omission}=0$.
 
-	% 	Table~{tab:time} shows the execution time of the Setup phase and of the basic iteration (I-Bas) and the optimized iteration (I-Opt). The values have been averaged over 3-5 executions. %a small number of executions, between 3 and 5.
+		{\bf Figure 2 comes here}
 
-	% 	%
-	% 	%The basic CEGAR loop  consist of a call to {\sc IsResist} and an SMT call to find the next schedule. The running time of the first method takes the vast majority of the running time. It is possible to add an optimization and/or a call to the method {\sc Calc-$\ell$} to the basic loop. All the values are averages of $3-5$ runs.
+		{\bf Monte-Carlo}: 
+		The Monte-Carlo approach, which is described in Section 3 was also implemented in Python using randomization functions from the numpy \cite{numpy} library. We used the Hoeffding's Inequality \cite{hoeffding} to calculate the number of iterations needed to acheive the desired error and confidence levels. We also tried to improve the run time by using multiprocessing. We evaluated the Monte Carlo approach using an error $\epsilon=0.01$, and a confidence of $\\delta=0.99$. We used 4 threads for the multiprocessing variant of Monte-Carlo approach. We choose this number after comparing the run times of the threaded approach  with different number of threads. The run times obtained for the threaded and linear programs are shown in Figure 3.
 
+		{\bf Figure 3 comes here}
 
-	% \begin{table}[htbp]
-	% 	\begin{center}
-	% 	\begin{tabular}{|c|c|c|c|c|}
-	% 	\hline
-	% 	Size: $k$& Setup (sec) & I-Bas (sec) & I-Opt (sec)\\
-	% 	\hline
-	% 	\hline
-	% 	S: $k=1$& {\small $2.03$} & {\small $11.3$} & {\small $27.17$}  \\
-	% 	\hline
-	% 	S: $k=2$ & {\small $2.04$} & {\small $17.64$} & {\small $31.5$} \\
-	% 	\hline
-	% 	S: $k=3$ & {\small $2.07$} & {\small $17.42$} & {\small $31.08$}\\
-	% 	\hline
-	% 	L: $k=1$ & {\small $11.92$} &{\small $142.18$} & {\small $261.91$} \\
-	% 	\hline
-	% 	\end{tabular}
-	% 	\end{center}
-	% 	\stam{
-	% 	\begin{table}[htbp]
-	% 	\begin{center}
-	% 	\begin{tabular}{|c|c|c|c|c|}
-	% 	\hline
-	% 	Size: $k$& Pre-run &I_{Bas} & I_{Opt} & B+{\sc Calc-$\ell$}\\
-	% 	\hline
-	% 	\hline
-	% 	S: $k=1$& {\small $2.03$} & {\small $11.28+0.02$} & {\small $15.1$ $(15.87)$} & {\small $7.27$} \\
-	% 	\hline
-	% 	S: $k=2$ & {\small $2.04$} & {\small $17.6+0.04$} & {\small $12.86$ $(13.86)$} & {\small $68.6$} \\
-	% 	\hline
-	% 	S: $k=3$ & {\small $2.07$} & {\small $17.4+0.02$} & {\small $12.93$ $(13.66)$} & {\small $823.22$} \\
-	% 	\hline
-	% 	L: $k=1$ & {\small $11.92$} &{\small $142.06+0.12$} & {\small $112.53$ $(119.73)$} & {\small $9386$} \\
-	% 	\hline
-	% 	\end{tabular}
-	% 	\end{center}
-	% 	}
-	% 	\vspace{-0.4cm}
-	% 	\caption{Execution times of the Setup phase and the iterations (without and with optimization) of the CEGAR loop.}%S and L represent small and large networks, respectively. All times are in seconds.}
-	% 	\label{tab:time}
-	% \end{table}
+	\noindent{\bf Observations}
+		Upon comparing Figures 1, 2 and 3, it seems that the Iterative approach scales better than WMC. However, the probability bounds provided by the Iterative approach are very loose for large Networks. We see that the WMC approach works very well for small settings consisting of upto 7 nodes. For settings larger than this, the Monte-Carlo approach works the best. Figure 4 combines the results in Figures 1-3, and gives a clear idea of the relative run times of the WMC, Iterative approaches and the Monte-Carlo approach. 
 
-	% It is interesting to observe that the execution time of one iteration with optimization is sensibly longer than the one of a basic iteration. Nevertheless, considering the overall time needed for finding a $(k,\ell)$-resistant schedule, the optimization yields much better results than the basic loop. In Table~{tab:iter} we show the average number of iterations till the CEGAR loop terminates when the optimization is used: typically, the CEGAR loop terminates after one or two iterations.  If the optimization finds that it is not possible to recover from the first configuration $C_0$, it adds the constraint \ff to the program, thereby indicating that no $(k,\ell)$-resistant schedule exists
-	% and terminating the CEGAR loop. We find that this generally occurs in the first few iterations. % of the CEGAR loop.
-	% %This holds both for the initial run described above with $\ell=m$, and for the second run with $\ell = \ell_S +1$.  
-	% In contrast, when running the CEGAR loop with no optimization, the performance is poor. The run either finds the first schedule to be $(k,\ell)$-resistant or it does not terminate.
-
-
-	% % we observe that {\sc $\exists$SchedGivConf} performs very well for random settings as we illustrate in Table~{tab:iter}, which depicts the average number of iterations till the CEGAR loop terminates when the optimization is used.
-	% %Typically, the CEGAR loop terminates after one or two iterations. 
-	% %If the optimization finds that it is not possible to recover from the first configuration $C_0$,
-	% %it adds the constraint \ff to the program, thereby 
-	% %indicating that no $(k,\ell)$-resistant schedule exists
-	% %and terminating the CEGAR loop.
-	% %We find that this typically occurs in the first few iterations.% of the CEGAR loop.
-	% %%This holds both for the initial run described above with $\ell=m$, and for the second run with $\ell = \ell_S +1$.  
-	% %When running the CEGAR loop with no optimization,% and the same setting and parameters, 
-	% %the performance is poor. The run either finds the first schedule to be $(k,\ell)$-resistant or it does not terminate.
-
-
-	% \begin{table}[htbp]
-	% \begin{center}
-	% \begin{tabular}{|c|c|c|}
-	% \hline
-	% Size: $k$& Number of iterations\\% & no OPT \\
-	% \hline
-	% \hline
-	% S: $k=1$& 1.4  \\
-	% \hline
-	% S: $k=2$ & 1.2\\
-	% \hline
-	% S: $k=3$ & 1.4\\
-	% \hline
-	% S: $k=4$ & 1 \\
-	% \hline
-	% L: $k=1$ & 1.3 \\
-	% \hline
-	% \end{tabular}
-	% \end{center}
-	% \vspace{-0.4cm}
-	% \caption{The average number of iterations till the CEGAR loop terminates.}
-	% \label{tab:iter}
-	% \end{table}
-
-
-
-
-
-	% %%% OLD - Before Guillermo %%%%
-
-	% %Our goal in the implementation is to evaluate the performance of our CEGAR loop rather than focusing on scalability. 
-	% %So, we evaluated on relatively small networks to keep a low running time for the iterations. Since the running time of an iteration varies significantly we list in Table~{tab:time} the running times of the different components of the program. We considered small settings (S) with $30$ vertices, $50$ messages, $40$ edges, a timeout of $10$, and $\ell = 45$ while considering different values for $k$, and a larger setting (L) with $100$ vertices, $150$ messages, $200$ edges, a timeout of $12$, and $\ell=150$. The basic CEGAR loop, referred to as B, consist of a call to {\sc IsResist} and an SMT call to find the next schedule. The running time of the first method takes the vast majority of the running time. It is possible to add an optimization and/or a call to the method {\sc Calc-$\ell$} to the basic loop. All the values are averages of $3-5$ runs.
-	% %
-	% %
-	% %\begin{table}[htbp]
-	% %\begin{center}
-	% %\begin{tabular}{|c|c|c|c|c|}
-	% %\hline
-	% %Size: $k$& Pre-run &B & B+Opt & B+{\sc Calc-$\ell$}\\
-	% %\hline
-	% %\hline
-	% %S: $k=1$& {\small $2.03$} & {\small $11.3$} & {\small $27.17$} & {\small $7.27$} \\
-	% %\hline
-	% %S: $k=2$ & {\small $2.04$} & {\small $17.64$} & {\small $31.5$} & {\small $68.6$} \\
-	% %\hline
-	% %S: $k=3$ & {\small $2.07$} & {\small $17.42$} & {\small $31.08$} & {\small $840.64$} \\
-	% %\hline
-	% %L: $k=1$ & {\small $11.92$} &{\small $142.18$} & {\small $261.91$} & {\small $9528.18$} \\
-	% %\hline
-	% %\end{tabular}
-	% %\end{center}
-	% %\stam{
-	% %\begin{table}[htbp]
-	% %\begin{center}
-	% %\begin{tabular}{|c|c|c|c|c|}
-	% %\hline
-	% %Size: $k$& Pre-run &B & B+Opt & B+{\sc Calc-$\ell$}\\
-	% %\hline
-	% %\hline
-	% %S: $k=1$& {\small $2.03$} & {\small $11.28+0.02$} & {\small $15.1$ $(15.87)$} & {\small $7.27$} \\
-	% %\hline
-	% %S: $k=2$ & {\small $2.04$} & {\small $17.6+0.04$} & {\small $12.86$ $(13.86)$} & {\small $68.6$} \\
-	% %\hline
-	% %S: $k=3$ & {\small $2.07$} & {\small $17.4+0.02$} & {\small $12.93$ $(13.66)$} & {\small $823.22$} \\
-	% %\hline
-	% %L: $k=1$ & {\small $11.92$} &{\small $142.06+0.12$} & {\small $112.53$ $(119.73)$} & {\small $9386$} \\
-	% %\hline
-	% %\end{tabular}
-	% %\end{center}
-	% %}
-	% %\vspace{-0.4cm}
-	% %\caption{The running times of the components in an iteration of the CEGAR loop in seconds. S and L represent small and large networks, respectively. }
-	% %\label{tab:time}
-	% %\end{table}
-	% %
-	% %Before the CEGAR loop, an initial schedule is found by calling the method {\sc $\exists$Sched}, which implements the program that is described in Theorem~{thm:exists-schedule}. An iteration of the CEGAR loop starts with a call to the method {\sc IsResist}, which is an implementation of the program that is described in Theorem~{thm:worst-faults}. Calling {\sc IsResist}$(S,k,\ell)$ returns $\tt$ if schedule $S$ is $(k,\ell)$-resistant, and otherwise the method returns a fault sequence that witnesses the non-resistance of $S$. Assuming the schedule is not $(k,\ell)$-resistant, the second method that is run in the CEGAR loop is {\sc $\exists$SchedGivConf}, which implements the optimization that is described in Theorem~{thm:optimization}. A call to {\sc $\exists$SchedGivConf}$(F, C_i)$ returns $\tt$ if it is possible to recover from the configuration $C_i$, assuming the sequence of faults $F$ occurs. 
-	% %We perform this check for every time point $0 \leq i \leq t-1$
-	% %such that the $i$-constraint is not $\tt$. 
-	% %If for some time $i$, we find that it is not possible to recover from $C_i$,
-	% %we add $\neg \psi^i$ to the SMT program.
-	% %We solve a final SMT program to generate a new schedule for the next iteration. 
-	% %
-	% %
-	% %
-	% %
-	% %%\multirow{2}{*}{\parbox{1.5cm}{\centering Activation\\costs}}
-	% %
-	% %
-	% %
-	% %%We used a relatively dense network with $30 \leq n \leq 50$ nodes, and between $1.2n$ and $1.5n$ edges. The number of messages we use is equal to the number of edges. In such a network, the number of edges that appears in the first path is typically between $1$ and $7$. Using the naive path-finding algorithm, the second paths are of the same length as the first paths, and with the smarter algorithm the sizes of the second path vary and is more than that of the first path. Let $p$ be the length of the longest first path. In our experiments, we use a timeout that is slightly higher than $p$, e.g., between $p+1$ and $p+3$. The running time of an iteration with these parameters varies, but typically does not exceed roughly $30$ seconds. We elaborate on what an iteration consists of below. We also ran on larger networks with $100$ nodes, $200-250$ edges, and $150$ messages. An iteration does not exceed $300$ seconds for these parameters.
-	% %
-	% %
-	% %
-	% %We observe that for the small networks, the majority of the running time is spent in the setup of the program, i.e., initializing the variables and constraints of the program, rather than in the solution of the program. We amortized some of the programs we construct by re-using most of the constraints. As we show in Table~{tab:time}, the amortization significantly decreases the running time of the subsequent calls to {\sc $\exists$SchedGivConf}.
-	% %
-	% %note that in many of our programs, most of the constraints are very similar. We reuse some of our Z3 solvers, thereby amortizing the running time. For example, the first call to {\sc $\exists$SchedGivConf} takes $16$ seconds and the following calls take much less than $1$ second. 
-
-	% \noindent{\bf Additional results}
-	% We found the following workflow convenient and useful in practice. We assume the network is typically fixed as well as the number of faults $k$. %The parameter that the designer has control on are the number of messages $m$ that are sent, and on the guarantee of messages received $\ell$. 
-	% For a fixed setting, and fixed $k$, we refer to the {\em best} $\ell$ as the highest $\ell$ such that a $(k,\ell)$-resistant schedule exists and no $(k,\ell+1)$-resistant schedule exists.  
-	% If the best $\ell$ is too low, the designer can use redundancy and increase $m$. %Initially, we fix $m$. 
-	% We observe that it is convenient to run the CEGAR loop with $\ell = m$. Since we assume $k>0$, it is rare that a $(k,m)$-resistant schedule exists. But, an initial schedule $S$ is typically found. 
-
-	% We implemented a method, which we call {\sc Calc-$\ell$}, that finds the largest $\ell_S$ such that $S$ is $(k, \ell_S)$-resistant.
-	% This $\ell_S$ gives us a guess on the best $\ell$. The method we implement is a binary search that performs calls to the method {\sc IsResist}. That is, for $0 \leq c \leq \ell$, we call {\sc IsResist}$(S,k, c)$. If it returns $\tt$, then $S$ is $(k,\ell)$-resistant and we increase $c$, and otherwise we decrease $c$. As mentioned above, the programs in the binary search differ in exactly one constraint; the constraint that guarantees that less than $\ell$ messages arrive on time. Amortizing the construction helps, but the running time of this method is significant ($\sim823s$ for S:$k=3$ and $\sim9386s$ for L:$k=1$) mostly due to calls to {\sc IsResist} that are UNSAT.
-
-	% We observe one phenomenon that is surprising for us. Often the first schedule is the ``best'' schedule. That is, if $S$ is the first schedule that is found and its guarantee is $\ell_S$, then $\ell_S$ is often the best $\ell$. %This is independent of the path-finding algorithm that is used while it is more common with the naive algorithm. 
-	% To verify that $\ell_S$ is indeed the best $\ell$,  we run the CEGAR loop with the same setting and set $\ell = \ell_S +1$. The reason behind this result remains unknown and will require further investigation.
-
-	% %We observe that sometimes, with optimization, the CEGAR loop times out. Moreover, we notice that in these cases, the same fault sequence is found repeatedly.% found in most iterations. We conjecture that it is possible to improve our optimization or use the existing one in order to find the next schedule in a move clever manner in order to avoid these cases.
-
-
+% --------------------Parse Pointer--------------------------
 
 \end{document}
