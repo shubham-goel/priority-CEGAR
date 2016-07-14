@@ -1215,13 +1215,13 @@ def CEGAR(stng, M, t, l,
 
 	elif probabalistic:
 
-		p_omissions=0
+		p_omissions=0.01
 		p_crashes=0.01
 		p_delays=0
-		precision=100
+		precision=10
 
 		epsilon=0.01
-		confidence=0.999
+		confidence=0.99
 
 		p_omissions=reduce_precision(p_omissions,precision)
 		p_crashes=reduce_precision(p_crashes,precision)
@@ -1488,9 +1488,6 @@ if __name__ == '__main__':
 
 	# filename='{}-{}-{}-{}-{}-{}.setting'.format(n,m,e,t,k,l)
 	filename="settings.curr"
-
-	# Remove old Schedules
-	clearFolder("schedules/")
 
 	exit_status = main(n,m,e,t,l,
 		k_crashes=k,filename=filename, save=save, load=load, optimize=optimize,
