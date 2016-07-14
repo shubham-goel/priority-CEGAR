@@ -238,7 +238,7 @@ class Glbl:
 class weight_var:
 	def __init__(self, name, p=0):
 		self.id = name
-		self.name = name
+		self.name = str(name)
 		self.var = Bool('WV_'+str(name))
 		self.weight = p
 

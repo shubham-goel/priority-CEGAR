@@ -167,6 +167,204 @@ def Adverserial(stng, pr, M, t, l,
 			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
 			return False
 
+def weightMC(stng, pr, M, t, l,epsilon=0.01,
+	p_omissions=0,p_crashes=0,p_delays=0):
+	'''
+	Returns the approximate probability of pr failing, given the crash parameters
+	'''
+	print ''
+	print '###############################################'
+	print '###############################################'
+	print_time('RUNNING weightMC...')
+	print ''
+	print 'p_omissions={}\np_crashes={}'.format(p_omissions,p_crashes)
+	print ''
+
+	s = myGoal()
+
+	st_time=time.time()
+	rt_dat = {}
+	rt_dat['timing_time'] = 0
+	rt_dat['k_maxSimulationConstraints_BOOL'] = {}
+	rt_dat['z3 sat'] = {}
+	rt_dat['z3 check'] = {}
+	rt_dat['z3 to cnf'] = {}
+	rt_dat['cnf to dimacs'] = {}
+	rt_dat['timing_time'] += time.time() - st_time
+
+
+	print 'Adding constraints...',time.time()
+	st_time=time.time()
+	defineSimulationVariables(stng, M, t)
+	generalSimulationConstraints(stng,s, M, t, l, l_is_upperBound=True)
+	specificSimulationConstraints(stng, s, pr, M, t, l)
+	rt_dat['generate program'] = time.time() - st_time
+
+	lower_bound=0
+	upper_bound=1
+
+	n = len(stng.g.V)
+	m = len(M)
+	e = len(stng.g.E)
+	l = m
+
+	k_omissions=0
+	k_crashes=0
+	k_delays=0
+
+	end_time=0
+	start_time=0
+	func_start_time=time.time()
+
+	print_time('STARTING successProb Iterations')
+	while True:
+		# count_time = end_time-start_time
+		# print "Time taken = {}".format(count_time)
+		# if AskContinue(lower_bound,upper_bound,k_crashes) is False:
+		if upper_bound-lower_bound < epsilon:
+			break
+		if k_crashes>len(stng.g.E): break
+		print '----------------------k_crashes =',k_crashes,'-----------------------'
+
+		# create backtracking point for successive values of k
+		s.push()
+
+		start_time = time.time()
+
+		# BIT-ADDED BASED SAT COUNTING
+		# COMPUTES ONLY BOUNDS ON PRIORITY
+		print 'Adding k_maxSimulationConstraints...',time.time()
+		st_time=time.time()
+		k_maxSimulationConstraints_BOOL(stng,s, t, exact=True,
+			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
+		rt_dat['k_maxSimulationConstraints_BOOL'][k_crashes] = time.time() - st_time
+
+		temp_time=time.time()
+		if s.get_solver().check() == sat:
+			print 'Sat!'
+			rt_dat['z3 sat'][k_crashes]=True
+			rt_dat['z3 check'][k_crashes]=time.time()-temp_time
+
+			t3=print_time("setting weight vars...")
+			weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,precision=100,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+			glbl_vars.init()
+			cnf_file = "weightMC_dimacs{}.txt".format(k_crashes)
+			sol_file = "weightMC_num_sols{}.txt".format(k_crashes)
+			# tact = Tactic('tseitin-cnf')
+			tact = With('tseitin-cnf',distributivity=False)
+			t4=print_time("z3 to cnf...")
+			cnf = tact(s.get_goal())[0]
+			t5=print_time("cnf to dimacs...")
+			glbl_vars.init_weight_vars_to_number()
+			dimacs = cnf_to_DIMACS(cnf,record_wv_mapping=True)
+			t6=print_time("saving dimacs to file...")
+			save_DIMACS_to_file(dimacs,cnf_file,weight_vars=weight_vars)
+
+			# Run SharpSat on file
+			t7=print_time("running weightMC on file...")
+			weightMC_numSols, weightMC_time = run_weightMC(cnf_file,sol_file)
+
+			st_time=time.time()
+			rt_dat['z3 to cnf'][k_crashes]=t5-t4
+			rt_dat['cnf to dimacs'][k_crashes]=t6-t5
+			rt_dat['timing_time'] += time.time() - st_time
+		else:
+			print 'Unsat!'
+			rt_dat['z3 sat'][k_crashes]=False
+			rt_dat['z3 check'][k_crashes]=time.time()-temp_time
+			weightMC_numSols=0
+			weightMC_time=rt_dat['z3 check'][k_crashes]
+
+		# =================================
+
+
+		# t3=print_time("converting to unweighted...")
+		# denom = wieghted_to_unweighted(stng,s,weight_vars,t,
+		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+
+		# # print ''
+		# # print "denom = 2**{}".format(math.log(denom,2))
+		# # print "normalization_factor = {}".format(normalization_factor)
+		# # print ''
+
+		# # Process and save Formula to file
+		# glbl_vars.init()
+		# cnf_file = "umc_dimacs{}.txt".format(k_crashes)
+		# sol_file = "umc_num_sols{}.txt".format(k_crashes)
+		# # tact = Tactic('tseitin-cnf')
+		# tact = With('tseitin-cnf',distributivity=False)
+		# t4=print_time("z3 to cnf...")
+		# cnf = tact(s.get_goal())[0]
+		# t5=print_time("cnf to dimacs...")
+		# dimacs = cnf_to_DIMACS(cnf)
+		# t6=print_time("saving dimacs to file...")
+		# save_DIMACS_to_file(dimacs,cnf_file)
+
+		# # Run SharpSat on file
+		# t7=print_time("running SharpSat on file...")
+		# sharpSAT_numSols,sharpSAT_time = run_sharpSAT(cnf_file,sol_file,return_time=True)
+		# if not (isinstance(sharpSAT_numSols,int) or isinstance(sharpSAT_numSols,long)):
+		# 	print "\n\n"
+		# 	print "numSols is not integral"
+		# 	print "Type =",type(sharpSAT_numSols)
+		# 	print "sharpSAT_time = {}".format(sharpSAT_time)
+		# 	print "numSols = {}".format(sharpSAT_numSols)
+		# 	print "\n"
+		# 	prob = sharpSAT_numSols
+		# else:
+		# 	denom = Decimal(normalization_factor)*Decimal(denom)
+		# 	prob = Decimal(sharpSAT_numSols)/denom
+		# 	prob = +prob
+		# 	print "\n\n"
+		# 	print "sharpSAT_time = {}".format(sharpSAT_time)
+		# 	print "numSols = {}".format(sharpSAT_numSols)
+		# 	print "denom = {}".format(denom)
+		# 	print "prob = {}".format(prob)
+		# 	print "\n"
+
+		# print "\n\nWMC method:"+str(prob),weightMC_time
+		# print "WeightMC method:"+str(weightMC_numSols),sharpSAT_time,'\n\n'
+
+		# ==========================================
+		if weightMC_numSols == 'timeout':
+			print "Timeout"
+			print_time('RETURNING weightMC...')
+			print '###############################################'
+			print '###############################################'
+			print ''
+			return ((lower_bound,upper_bound),'Timeout'),rt_dat
+
+
+		p1 = float(str(weightMC_numSols))
+		p2 = crashesProbability(stng,M,t,
+				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+
+		# Update Bounds
+		lower_bound += p2 - p1
+		upper_bound -= p1
+
+		print '\n\n'
+		print 'p1',p1
+		print 'p2',p2
+		print 'Time = {}'.format(weightMC_time)
+		print 'Bounds',lower_bound,upper_bound
+		print 'Uncertainity',upper_bound-lower_bound
+		print '\n\n'
+
+		s.pop()
+
+		k_omissions=0
+		k_crashes=k_crashes+1
+		k_delays=0
+
+	print_time('RETURNING weightMC...')
+	print '###############################################'
+	print '###############################################'
+	print ''
+	return (lower_bound,upper_bound),rt_dat
+
 def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
@@ -1017,10 +1215,10 @@ def CEGAR(stng, M, t, l,
 
 	elif probabalistic:
 
-		p_omissions=0.015625
-		p_crashes=0.015625
+		p_omissions=0
+		p_crashes=0.01
 		p_delays=0
-		precision=10
+		precision=100
 
 		epsilon=0.01
 		confidence=0.999
@@ -1038,56 +1236,112 @@ def CEGAR(stng, M, t, l,
 		rt_dat = {}
 		rt_dat['timing_time'] = 0
 
-		timings[-4]=time.time()
-		prob['0b'],rt_dat['0b_inner']=successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
+		run = {}
+		run['incremental k, z3-based naive counting']=True
+		run['incremental k, z3-based naive counting, optimized']=True
+		run['incremental k, bit-adder with weightMC']=True
+		# Have enough Data
+		run['WMC MessageRR']=True
+		run['MonteCarlo MessageRR']=True
+		run['MonteCarlo MessageRR threads']=True
+		# Hardly Used
+		run['incremental k, simultaneous crashes, bit-adder']=True
+		run['WMC EdgeRR']=True
+		run['MonteCarlo EdgeRR']=True
+		run['MonteCarlo EdgeRR threads']=True
+
+		if run['incremental k, simultaneous crashes, bit-adder']:
+			t1=time.time()
+			prob['0b'],rt_dat['0b_inner']=successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		timings[-3]=time.time()
-		prob['0o'],rt_dat['0o_inner']=successProb(stng, pr, M, t, l,optimize=True,naive=True,
+			rt_dat['0b']=time.time()-t1
+
+		if run['incremental k, z3-based naive counting']:
+			t1=time.time()
+			prob['0a'],rt_dat['0a_inner']=successProb(stng, pr, M, t, l,optimize=False,naive=True,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		timings[-2]=time.time()
-		prob['0a'],rt_dat['0a_inner']=successProb(stng, pr, M, t, l,optimize=False,naive=True,
+			rt_dat['0a']=time.time()-t1
+
+		if run['incremental k, z3-based naive counting, optimized']:
+			t1=time.time()
+			prob['0o'],rt_dat['0o_inner']=successProb(stng, pr, M, t, l,optimize=True,naive=True,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
-		timings[-1]=time.time()
-		# prob['1e'],rt_dat['1e_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
-		# 			RR='edge')
-		timings[0]=time.time()
-		prob['1m'],rt_dat['1m_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+			rt_dat['0o']=time.time()-t1
+			rt_dat['doomed_state_timing'] = glbl_vars.doomed_state_rt
+
+		if run['incremental k, bit-adder with weightMC']:
+			t1=time.time()
+			prob['3m'],rt_dat['3m_inner'] = weightMC(stng, pr, M, t, l,
+				p_omissions=p_omissions,p_crashes=p_crashes)
+			rt_dat['3m']=time.time()-t1
+
+		if run['WMC EdgeRR']:
+			t1=time.time()
+			prob['1e'],rt_dat['1e_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
+					RR='edge')
+			rt_dat['1e']=time.time()-t1
+
+		if run['WMC MessageRR']:
+			t1=time.time()
+			prob['1m'],rt_dat['1m_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='message')
-		timings[1]=time.time()
-		# prob['2e']=monte_carlo_Score(stng, pr, M, t, l,RR='edge',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=epsilon,confidence=confidence)
-		timings[2]=time.time()
-		# prob['2et']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,
-		# 			epsilon=epsilon,confidence=confidence)
-		timings[3]=time.time()
-		prob['2m']=monte_carlo_Score(stng, pr, M, t, l,RR='message',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=epsilon,confidence=confidence)
-		timings[4]=time.time()
-		prob['2mt']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
-					p_omissions=p_omissions,p_crashes=p_crashes,
-					epsilon=epsilon,confidence=confidence)
-		timings[5]=time.time()
+			rt_dat['1m']=time.time()-t1
 
+		if run['MonteCarlo EdgeRR']:
+			t1=time.time()
+			prob['2e']=monte_carlo_Score(stng, pr, M, t, l,RR='edge',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=epsilon,confidence=confidence)
+			rt_dat['2e']=time.time()-t1
+
+		if run['MonteCarlo EdgeRR threads']:
+			t1=time.time()
+			prob['2et']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='edge',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=epsilon,confidence=confidence)
+			rt_dat['2et']=time.time()-t1
+
+		if run['MonteCarlo MessageRR']:
+			t1=time.time()
+			prob['2m']=monte_carlo_Score(stng, pr, M, t, l,RR='message',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=epsilon,confidence=confidence)
+			rt_dat['2m']=time.time()-t1
+
+		if run['MonteCarlo MessageRR threads']:
+			t1=time.time()
+			prob['2mt']=monte_carlo_Score_thread(stng, pr, M, t, l,RR='message',
+					p_omissions=p_omissions,p_crashes=p_crashes,
+					epsilon=epsilon,confidence=confidence)
+			rt_dat['2mt']=time.time()-t1
 
 
 		print ''
 		print ''
 		print '#Final Probabilities:'
 		print ''
-		print 'successProb bit-adder        \t',prob['0b'],timings[-3]-timings[-4]
-		print 'successProb OPT              \t',prob['0o'],timings[-2]-timings[-3]
-		print 'successProb NO OPT           \t',prob['0a'],timings[-1]-timings[-2]
-		# print 'priorityScore edgeRR         \t',prob['1e'],timings[0]-timings[-1]
-		print 'priorityScore messageRR      \t',prob['1m'],timings[1]-timings[0]
-		# print 'monte_carlo edgeRR           \t',prob['2e'],timings[2]-timings[1]
-		# print 'monte_carlo thread edgeRR    \t',prob['2et'],timings[3]-timings[2]
-		print 'monte_carlo messageRR        \t',prob['2m'],timings[4]-timings[3]
-		print 'monte_carlo thread messageRR \t',prob['2mt'],timings[5]-timings[4]
+		try: print 'successProb bit-adder        \t',prob['0b'],rt_dat['0b']
+		except: pass
+		try: print 'successProb NO OPT           \t',prob['0a'],rt_dat['0a']
+		except: pass
+		try: print 'successProb OPT              \t',prob['0o'],rt_dat['0o']
+		except: pass
+		try: print 'successProb weightMC         \t',prob['3m'],rt_dat['3m']
+		except: pass
+		try: print 'priorityScore edgeRR         \t',prob['1e'],rt_dat['1e']
+		except: pass
+		try: print 'priorityScore messageRR      \t',prob['1m'],rt_dat['1m']
+		except: pass
+		try: print 'monte_carlo edgeRR           \t',prob['2e'],rt_dat['2e']
+		except: pass
+		try: print 'monte_carlo thread edgeRR    \t',prob['2et'],rt_dat['2et']
+		except: pass
+		try: print 'monte_carlo messageRR        \t',prob['2m'],rt_dat['2m']
+		except: pass
+		try: print 'monte_carlo thread messageRR \t',prob['2mt'],rt_dat['2mt']
+		except: pass
 		print ''
 		print ''
 
@@ -1135,25 +1389,11 @@ def CEGAR(stng, M, t, l,
 		# params['M'] = [(msg.s.name, msg.t.name, msg.id) for msg in M]
 		# params['edges'] = [(edge.s,edge.t) for edge in stng.g.E]
 
-		# Store final timing data in object
-		st = time.time()
-		rt_dat['0b'] = timings[-3]-timings[-4]
-		rt_dat['0o'] = timings[-2]-timings[-3]
-		rt_dat['0a'] = timings[-1]-timings[-2]
-		# rt_dat['1e'] = timings[0]-timings[-1]
-		rt_dat['1m'] = timings[1]-timings[0]
-		# rt_dat['2e'] = timings[2]-timings[1]
-		# rt_dat['2et'] = timings[3]-timings[2]
-		rt_dat['2m'] = timings[4]-timings[3]
-		rt_dat['2mt'] = timings[5]-timings[4]
-		rt_dat['doomed_state_timing'] = glbl_vars.doomed_state_rt
-		rt_dat['timing_time'] += time.time() - st
-
 		# Store Parameters,Probabilities and run-time data to file
 		save_scaling_data_to_file(params,rt_dat,prob)
 
 		# Return from CEGAR
-		prob = prob['1m']
+		prob = prob['3m']
 
 		end_time = time.time()
 		count_time = end_time-start_time

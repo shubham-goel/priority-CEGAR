@@ -571,26 +571,26 @@ def new_unused_variable():
 # DIMACS
 ########
 
-def cnf_to_DIMACS(cnf):
+def cnf_to_DIMACS(cnf,record_wv_mapping=False):
 	'''
 	Convert cnf formulaoutputted bu z3 into DIMACS Format
 	'''
 	glbl_vars.init()
-	dimacs = [clause_to_DMACS(clause) for clause in cnf]
+	dimacs = [clause_to_DMACS(clause,record_wv_mapping=record_wv_mapping) for clause in cnf]
 
 	return dimacs
 
-def clause_to_DMACS(clause):
+def clause_to_DMACS(clause,record_wv_mapping=False):
 	clause = str(clause)
 
 	if clause[:3] == "Or(":
 		clause = clause[3:-1]
 
-	dmacs_clause = [literal_to_number(literal) for literal in clause.split(",")]
+	dmacs_clause = [literal_to_number(literal,record_wv_mapping=record_wv_mapping) for literal in clause.split(",")]
 
 	return dmacs_clause
 
-def literal_to_number(literal):
+def literal_to_number(literal,record_wv_mapping=False):
 	literal=literal.strip(" \t\n")
 	neg = False
 	if len(literal) > 5 and literal[:4]=="Not(":
@@ -605,19 +605,45 @@ def literal_to_number(literal):
 		lit_num = glbl_vars.variable_number
 		glbl_vars.variable_number += 1
 		glbl_vars.variable_name_to_number[literal] = lit_num
+		if record_wv_mapping:
+			if literal[:3] == "WV_":
+				assert not (literal[3:] in glbl_vars.weight_vars_to_number.keys())
+				glbl_vars.weight_vars_to_number[literal[3:]] = lit_num
+				# print 'Set WV -> '+literal[3:] 
 
 	if neg:
 		return (-1*lit_num)
 	else:
 		return (lit_num)
 
-def save_DIMACS_to_file(dimacs, filename):
+def save_DIMACS_to_file(dimacs, filename, weight_vars=None):
 	num_vars = glbl_vars.variable_number-1
 	num_clauses = len(dimacs)
 	with open(filename, "w") as f:
 		header = "p cnf {} {}\n".format(num_vars,num_clauses)
 		f.write(header)
 		f.write(''.join([format_DIMACS_clause(clause) for clause in dimacs]))
+		if weight_vars:
+			weight_vars_data = []
+			lit_weights_written = []
+			for wv in weight_vars:
+				try:
+					lit_num = glbl_vars.weight_vars_to_number[wv.name]
+					if wv.weight == 0:
+						weight_vars_data.append('{} 0\n'.format(-1*lit_num))
+					else:
+						weight_vars_data.append('w {} {}\n'.format(lit_num,wv.weight))
+					if wv.weight == 1:
+						weight_vars_data.append('{} 0\n'.format(lit_num))
+					else:
+						weight_vars_data.append('w {} {}\n'.format(-1*lit_num,1-wv.weight))
+					lit_weights_written.append(lit_num)
+				except:
+					raise
+			for lit_num in [item for item in range(1,num_vars+1) if item not in lit_weights_written]:
+					weight_vars_data.append('w {} {}\n'.format(lit_num,1))
+					weight_vars_data.append('w -{} {}\n'.format(lit_num,1))
+			f.write(''.join(weight_vars_data))
 	print ''
 	print "num_vars =",num_vars
 	print "num_clauses =",num_clauses
@@ -685,6 +711,27 @@ def process_sharpSat_output(sol_file,return_time=False):
 		return numSols,time_taken
 	else:
 		return numSols
+
+def process_weightMC_output(sol_file):
+	numSols = None
+	with open(sol_file, "r") as f:
+		for line in f:
+			if line=="The input formula is unsatisfiable.\n":
+				numSols=0
+				break
+			elif line[:34]=='Approximate weighted model count: ':
+				print line[34:-1]
+				expr = line[34:-1].split('x')
+				num1 = float(expr[0])
+				num2 = float(expr[1].split('^')[0])
+				num3 = float(expr[1].split('^')[1])
+				numSols = num1*(num2**num3)
+
+		if numSols is None:
+			sys.stderr.write('\n\n'+f.read()+'\n\n')
+			return 'error'
+
+	return numSols
 
 def set_weight_vars(stng, s, M, t,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0):
@@ -871,7 +918,31 @@ def run_approxMC(cnf_file,mis=False):
 			return 'error','error'
 		else:
 			return numSols,run_time
+def run_weightMC(cnf_file,sol_file):
+	start_t=time.time()
+	# run weightMC on file
+	cmd = "./weightmc {} > {}".format(cnf_file, sol_file)
+	bash_output=run_bash(cmd,timeout=glbl_vars.timeout_limit)
+	print 'weightMC',bash_output
+	end_t=time.time()
+	run_time=end_t-start_t
 
+	# Check output status
+	if bash_output=='timeout':
+		print 'Timeout'
+		run_bash('./kill_weightMC.sh')
+		return 'timeout','timeout'
+	# The exit codes returned by weightMC do not follow common convention
+	else:
+		# Process weightMC output to get #Sols/check for error
+		print "reading weightMC's output..."
+		numSols = process_weightMC_output(sol_file)
+		if numSols=='error':
+			run_bash('mkdir segmentation_faults')
+			run_bash('cp {} segmentation_faults/{}'.format(cnf_file,cnf_file))
+			return 'error','error'
+		else:
+			return numSols,run_time
 
 def run_sharpSAT(cnf_file,sol_file,return_time=False):
 	'''
