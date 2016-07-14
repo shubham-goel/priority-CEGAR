@@ -130,7 +130,7 @@ def AskContinue(lb,ub,k):
 	print "Uncertainity = {}".format(ub-lb)
 	ques="Do you want to continue with k={}".format(k)
 	print ques
-	return True
+	return (ub-lb)>=0.01
 	return query_yes_no(ques,default="yes")
 
 # Ref : http://code.activestate.com/recipes/577058/

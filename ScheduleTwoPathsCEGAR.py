@@ -1241,14 +1241,14 @@ def CEGAR(stng, M, t, l,
 		run['incremental k, z3-based naive counting, optimized']=True
 		run['incremental k, bit-adder with weightMC']=True
 		# Have enough Data
-		run['WMC MessageRR']=True
-		run['MonteCarlo MessageRR']=True
-		run['MonteCarlo MessageRR threads']=True
+		run['WMC MessageRR']=len(stng.g.V)<9
+		run['MonteCarlo MessageRR']=False
+		run['MonteCarlo MessageRR threads']=False
 		# Hardly Used
-		run['incremental k, simultaneous crashes, bit-adder']=True
-		run['WMC EdgeRR']=True
-		run['MonteCarlo EdgeRR']=True
-		run['MonteCarlo EdgeRR threads']=True
+		run['incremental k, simultaneous crashes, bit-adder']=False
+		run['WMC EdgeRR']=False
+		run['MonteCarlo EdgeRR']=False
+		run['MonteCarlo EdgeRR threads']=False
 
 		if run['incremental k, simultaneous crashes, bit-adder']:
 			t1=time.time()
