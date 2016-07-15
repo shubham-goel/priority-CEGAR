@@ -1378,10 +1378,10 @@ if __name__ == '__main__':
 	custom = options.custom
 	load = options.load or custom
 	save = not load
-	optimize = options.optimize
-	showProgress = options.showProgress
+	# optimize = options.optimize
+	# showProgress = options.showProgress
 	weight = options.weight
-	diff = options.diff
+	# diff = options.diff
 	countFaults = options.countFaults
 	probabalistic = options.probabalistic
 	n = int(sys.argv[1])
