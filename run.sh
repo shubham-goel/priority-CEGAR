@@ -9,7 +9,7 @@ rm -rf results
 mv new_results results
 
 k=0
-for nodes in `seq 10 50`;
+for nodes in `seq 10 2 50`;
 do
 	start_edges1=$((5*$nodes/2))
 	end_edges1=$((5*$nodes/2))
