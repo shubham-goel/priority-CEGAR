@@ -51,51 +51,6 @@ def count_WFS(stng, pr, M, t, l,
 
 	return counter
 
-def Adverserial(stng, pr, M, t, l,
-	k_omissions=0, k_crashes=0, k_delays=0,
-	optimize=False, showProgress=False):
-	'''
-	Adverserial setting.
-	'''
-	while True:
-		#redundant: print j,counter
-		#redundant: j += 1
-		#redundant: counter += 1
-
-		#redundant: if counter > 20:
-			#redundant: return "Timeout"
-
-		#mdl is has the information about the message priorities
-		pr = GeneratePriorities(stng, mdl, M)
-
-		crash_mdl = saboteurStrategy(stng, pr, M, t, l,
-			k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays)
-
-		if not crash_mdl:
-			#redundant: print 'FOUND (k-l) resistant schedule', "k=",','.join([k_omissions,k_crashes,k_delays]),"l=",l
-			#redundant: print pr
-			#redundant: save_to_file(pr,'schedules/Schedule_k'+','.join([k_omissions,k_crashes,k_delays])+'_l'+str(l))
-			l+=1
-			#redundant: counter=1
-			continue
-
-		#redundant: if showProgress:
-		#redundant: 	printProgress(stng, pr, M, t, l,
-		#redundant: 		k_omissions=k_omissions, k_crashes=k_crashes, k_delays=k_delays)
-
-		learnt = learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=pr)
-		if  learnt is False:
-			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
-			return False
-
-		#redundant: print 'start check()', time.time()
-		mdl = getModel(s)
-		#redundant: print 'end check()', time.time()
-
-		if mdl is False:
-			#redundant: print 'NO (k-l) resistant schedule EXISTS', "k=",k,"l=",l
-			return False
-
 def weightMC(stng, pr, M, t, l,epsilon=0.01,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
