@@ -345,7 +345,7 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 		print 'weightMC_numSols',weightMC_numSols
 		print 'normalization_factor',normalization_factor
 
-		p1 = float(str(weightMC_numSols))/normalization_factor
+		p1 = 0 # float(str(weightMC_numSols))/normalization_factor
 		p2 = crashesProbability(stng,M,t,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
