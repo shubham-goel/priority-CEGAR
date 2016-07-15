@@ -337,6 +337,47 @@ def reduce_precision(p,precision):
 			number += power
 	return number
 
+def excludeCrashModel(stng,s,crash_model,t,add_crashes=False,at_t_only=False,
+	omissions=False,crashes=False,delays=False):
+	if at_t_only:
+		begin_time=t
+		end_time=t+1
+	else:
+		begin_time=0
+		end_time=t
+
+	exclude_crashes = []
+
+	for e in stng.g.E:
+		for i in range(begin_time,end_time):
+
+			assert ((at_t_only is False) or (i==t))
+			# omissions
+			if omissions:
+				if is_true(crash_model[stng.vars.omit(e,i)]):
+					exclude_crashes.append(stng.vars.omit(e,i))
+				else:
+					exclude_crashes.append(Not(stng.vars.omit(e,i)))
+
+			# crashes
+			if crashes:
+				if is_true(crash_model[stng.vars.crash(e,i)]):
+					exclude_crashes.append(stng.vars.crash(e,i))
+				else:
+					exclude_crashes.append(Not(stng.vars.crash(e,i)))
+
+			# delays
+			if delays:
+				if is_true(crash_model[stng.vars.delay(e,i)]):
+					exclude_crashes.append(stng.vars.delay(e,i))
+				else:
+					exclude_crashes.append(Not(stng.vars.delay(e,i)))
+
+	if add_crashes:
+		s.add(And(exclude_crashes))
+	else:
+		s.add(Not(And(exclude_crashes)))
+
 def help():
 	print '''
 	USAGE:
@@ -629,7 +670,7 @@ def literal_to_number(literal,record_wv_mapping=False):
 			if literal[:3] == "WV_":
 				assert not (literal[3:] in glbl_vars.weight_vars_to_number.keys())
 				glbl_vars.weight_vars_to_number[literal[3:]] = lit_num
-				# print 'Set WV -> '+literal[3:] 
+				# print 'Set WV -> '+literal[3:]
 
 	if neg:
 		return (-1*lit_num)
@@ -938,6 +979,7 @@ def run_approxMC(cnf_file,mis=False):
 			return 'error','error'
 		else:
 			return numSols,run_time
+
 def run_weightMC(cnf_file,sol_file):
 	start_t=time.time()
 	# run weightMC on file

@@ -18,78 +18,7 @@ from Objects import *
 from Graph import GenerateSetting
 from Utilities import *
 from Constraints import *
-
-def saboteurStrategy(stng, S, M, t, l,
-	k_omissions=0, k_crashes=0, k_delays=0):
-	'''
-	Returns a Saboteur stratergy, if any
-	Returns False if no such Stratergy Exists
-	'''
-	# Initiate new solver for network simulation
-	s = Solver()
-
-	defineSimulationVariables(stng, M, t,
-		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
-	generalSimulationConstraints(stng,s, M, t, l)
-	specificSimulationConstraints(stng, s, S, M, t, l,)
-	k_maxSimulationConstraints(stng,s, t, exact=False,
-		k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
-
-	crash_mdl=getModel(s)
-
-	return crash_mdl
-
-# TODO
-def learnConstraints(stng, s, crash_mdl, M, t, optimize, l, S=None):
-	'''
-	Learn constraints from crash_mdl,
-	Add them to solver s
-
-	Return False if no such constraints exist,
-	Then no (k-l) resistant schedules exist
-	'''
-	return False
-
-def excludeCrashModel(stng,s,crash_model,t,add_crashes=False,at_t_only=False,
-	omissions=False,crashes=False,delays=False):
-	if at_t_only:
-		begin_time=t
-		end_time=t+1
-	else:
-		begin_time=0
-		end_time=t
-
-	exclude_crashes = []
-
-	for e in stng.g.E:
-		for i in range(begin_time,end_time):
-
-			assert ((at_t_only is False) or (i==t))
-			# omissions
-			if omissions:
-				if is_true(crash_model[stng.vars.omit(e,i)]):
-					exclude_crashes.append(stng.vars.omit(e,i))
-				else:
-					exclude_crashes.append(Not(stng.vars.omit(e,i)))
-
-			# crashes
-			if crashes:
-				if is_true(crash_model[stng.vars.crash(e,i)]):
-					exclude_crashes.append(stng.vars.crash(e,i))
-				else:
-					exclude_crashes.append(Not(stng.vars.crash(e,i)))
-
-			# delays
-			if delays:
-				if is_true(crash_model[stng.vars.delay(e,i)]):
-					exclude_crashes.append(stng.vars.delay(e,i))
-				else:
-					exclude_crashes.append(Not(stng.vars.delay(e,i)))
-
-	if add_crashes:
-		s.add(And(exclude_crashes))
-	else:
-		s.add(Not(And(exclude_crashes)))
+from AdverserialModel import *
 
 def count_WFS(stng, pr, M, t, l,
 	k_omissions=0,k_crashes=0,k_delays=0):
