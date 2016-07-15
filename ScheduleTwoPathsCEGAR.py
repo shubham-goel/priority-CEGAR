@@ -79,6 +79,8 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 
 	This uses a distribution-aware-sampling approximate WMC tool
 	'''
+	assert p_omissions==0
+	assert p_delays==0
 	print ''
 	print '###############################################'
 	print '###############################################'
@@ -146,15 +148,19 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 			k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 		rt_dat['k_maxSimulationConstraints_BOOL'][k_crashes] = time.time() - st_time
 
+		flag=False
 		temp_time=time.time()
 		if s.get_solver().check() == sat:
 			print 'Sat!'
+			flag=True
 			rt_dat['z3 sat'][k_crashes]=True
 			rt_dat['z3 check'][k_crashes]=time.time()-temp_time
 
+			magnification=1
+
 			t3=print_time("setting weight vars...")
 			weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,precision=100,
-				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,magnification=magnification)
 			glbl_vars.init()
 			cnf_file = "weightMC_dimacs{}.txt".format(k_crashes)
 			sol_file = "weightMC_num_sols{}.txt".format(k_crashes)
@@ -166,7 +172,7 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 			glbl_vars.init_weight_vars_to_number()
 			dimacs = cnf_to_DIMACS(cnf,record_wv_mapping=True)
 			t6=print_time("saving dimacs to file...")
-			save_DIMACS_to_file(dimacs,cnf_file,weight_vars=weight_vars)
+			save_DIMACS_to_file(dimacs,cnf_file,weight_vars=weight_vars,magnification=magnification)
 
 			# Run SharpSat on file
 			t7=print_time("running weightMC on file...")
@@ -181,6 +187,7 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 			rt_dat['z3 sat'][k_crashes]=False
 			rt_dat['z3 check'][k_crashes]=time.time()-temp_time
 			weightMC_numSols=0
+			normalization_factor=1
 			weightMC_time=rt_dat['z3 check'][k_crashes]
 
 		# =======================================
@@ -188,52 +195,53 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 		# the answer returned by the literal WMC approach
 		# ============Block Start================
 
-		# t3=print_time("converting to unweighted...")
-		# denom = wieghted_to_unweighted(stng,s,weight_vars,t,
-		# 			p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
+		# if flag:
+		# 	t3=print_time("Running SHARPSAT\nconverting to unweighted...")
+		# 	denom = wieghted_to_unweighted(stng,s,weight_vars,t,
+		# 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
-		# # print ''
-		# # print "denom = 2**{}".format(math.log(denom,2))
-		# # print "normalization_factor = {}".format(normalization_factor)
-		# # print ''
+		# 	print ''
+		# 	print "denom = 2**{}".format(math.log(denom,2))
+		# 	print "normalization_factor = {}".format(normalization_factor)
+		# 	print ''
 
-		# # Process and save Formula to file
-		# glbl_vars.init()
-		# cnf_file = "umc_dimacs{}.txt".format(k_crashes)
-		# sol_file = "umc_num_sols{}.txt".format(k_crashes)
-		# # tact = Tactic('tseitin-cnf')
-		# tact = With('tseitin-cnf',distributivity=False)
-		# t4=print_time("z3 to cnf...")
-		# cnf = tact(s.get_goal())[0]
-		# t5=print_time("cnf to dimacs...")
-		# dimacs = cnf_to_DIMACS(cnf)
-		# t6=print_time("saving dimacs to file...")
-		# save_DIMACS_to_file(dimacs,cnf_file)
+		# 	# Process and save Formula to file
+		# 	glbl_vars.init()
+		# 	cnf_file = "umc_dimacs{}.txt".format(k_crashes)
+		# 	sol_file = "umc_num_sols{}.txt".format(k_crashes)
+		# 	# tact = Tactic('tseitin-cnf')
+		# 	tact = With('tseitin-cnf',distributivity=False)
+		# 	t4=print_time("z3 to cnf...")
+		# 	cnf = tact(s.get_goal())[0]
+		# 	t5=print_time("cnf to dimacs...")
+		# 	dimacs = cnf_to_DIMACS(cnf)
+		# 	t6=print_time("saving dimacs to file...")
+		# 	save_DIMACS_to_file(dimacs,cnf_file)
 
-		# # Run SharpSat on file
-		# t7=print_time("running SharpSat on file...")
-		# sharpSAT_numSols,sharpSAT_time = run_sharpSAT(cnf_file,sol_file,return_time=True)
-		# if not (isinstance(sharpSAT_numSols,int) or isinstance(sharpSAT_numSols,long)):
-		# 	print "\n\n"
-		# 	print "numSols is not integral"
-		# 	print "Type =",type(sharpSAT_numSols)
-		# 	print "sharpSAT_time = {}".format(sharpSAT_time)
-		# 	print "numSols = {}".format(sharpSAT_numSols)
-		# 	print "\n"
-		# 	prob = sharpSAT_numSols
-		# else:
-		# 	denom = Decimal(normalization_factor)*Decimal(denom)
-		# 	prob = Decimal(sharpSAT_numSols)/denom
-		# 	prob = +prob
-		# 	print "\n\n"
-		# 	print "sharpSAT_time = {}".format(sharpSAT_time)
-		# 	print "numSols = {}".format(sharpSAT_numSols)
-		# 	print "denom = {}".format(denom)
-		# 	print "prob = {}".format(prob)
-		# 	print "\n"
+		# 	# Run SharpSat on file
+		# 	t7=print_time("running SharpSat on file...")
+		# 	sharpSAT_numSols,sharpSAT_time = run_sharpSAT(cnf_file,sol_file,return_time=True)
+		# 	if not (isinstance(sharpSAT_numSols,int) or isinstance(sharpSAT_numSols,long)):
+		# 		print "\n\n"
+		# 		print "numSols is not integral"
+		# 		print "Type =",type(sharpSAT_numSols)
+		# 		print "sharpSAT_time = {}".format(sharpSAT_time)
+		# 		print "numSols = {}".format(sharpSAT_numSols)
+		# 		print "\n"
+		# 		prob = sharpSAT_numSols
+		# 	else:
+		# 		denom = Decimal(normalization_factor)*Decimal(denom)
+		# 		prob = Decimal(sharpSAT_numSols)/denom
+		# 		prob = +prob
+		# 		print "\n\n"
+		# 		print "sharpSAT_time = {}".format(sharpSAT_time)
+		# 		print "numSols = {}".format(sharpSAT_numSols)
+		# 		print "denom = {}".format(denom)
+		# 		print "prob = {}".format(prob)
+		# 		print "\n"
 
-		# print "\n\nWMC method:"+str(prob),weightMC_time
-		# print "WeightMC method:"+str(weightMC_numSols),sharpSAT_time,'\n\n'
+		# 	print "\n\nWMC method:",str(prob),sharpSAT_time
+		# 	print "WeightMC method:",float(str(weightMC_numSols))/normalization_factor,weightMC_time,'\n\n'
 
 		# ============Block End================
 
@@ -245,8 +253,10 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 			print ''
 			return ((lower_bound,upper_bound),'Timeout'),rt_dat
 
+		print 'weightMC_numSols',weightMC_numSols
+		print 'normalization_factor',normalization_factor
 
-		p1 = float(str(weightMC_numSols))
+		p1 = float(str(weightMC_numSols))/normalization_factor
 		p2 = crashesProbability(stng,M,t,
 				k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
@@ -1270,13 +1280,13 @@ def CEGAR(stng, M, t, l,
 
 	elif probabalistic:
 
-		p_omissions=0
+		p_omissions=0.01
 		p_crashes=0.01
 		p_delays=0
-		precision=100
+		precision=10
 
 		epsilon=0.01
-		confidence=0.999
+		confidence=0.99
 
 		p_omissions=reduce_precision(p_omissions,precision)
 		p_crashes=reduce_precision(p_crashes,precision)
@@ -1293,11 +1303,11 @@ def CEGAR(stng, M, t, l,
 
 		# Here, Select the tools you wish to calulate probability with
 		run = {}
-		run['incremental k, z3-based naive counting']=True
-		run['incremental k, z3-based naive counting, optimized']=True
+		run['incremental k, z3-based naive counting']=False
+		run['incremental k, z3-based naive counting, optimized']=False
 		run['incremental k, bit-adder with weightMC']=True
 		# Have enough Data
-		run['WMC MessageRR']=len(stng.g.V)<9
+		run['WMC MessageRR']=False
 		run['MonteCarlo MessageRR']=False
 		run['MonteCarlo MessageRR threads']=False
 		# Hardly Used
@@ -1328,7 +1338,7 @@ def CEGAR(stng, M, t, l,
 		if run['incremental k, bit-adder with weightMC']:
 			t1=time.time()
 			prob['3m'],rt_dat['3m_inner'] = weightMC(stng, pr, M, t, l,
-				p_omissions=p_omissions,p_crashes=p_crashes)
+				p_omissions=0,p_crashes=p_crashes)
 			rt_dat['3m']=time.time()-t1
 
 		if run['WMC EdgeRR']:
@@ -1378,26 +1388,26 @@ def CEGAR(stng, M, t, l,
 		print ''
 		print '#Final Probabilities:'
 		print ''
-		try: print 'IterativeApproach bit-adder        \t',prob['0b'],rt_dat['0b']
-		except: pass
-		try: print 'IterativeApproach NO OPT           \t',prob['0a'],rt_dat['0a']
-		except: pass
-		try: print 'IterativeApproach OPT              \t',prob['0o'],rt_dat['0o']
-		except: pass
-		try: print 'IterativeApproach weightMC         \t',prob['3m'],rt_dat['3m']
-		except: pass
-		try: print 'literalWMC edgeRR         \t',prob['1e'],rt_dat['1e']
-		except: pass
-		try: print 'literalWMC messageRR      \t',prob['1m'],rt_dat['1m']
-		except: pass
+		try: print 'IterativeApproach bit-adder  \t',prob['0b'],rt_dat['0b']
+		except: print ''
+		try: print 'IterativeApproach NO OPT     \t',prob['0a'],rt_dat['0a']
+		except: print ''
+		try: print 'IterativeApproach OPT        \t',prob['0o'],rt_dat['0o']
+		except: print ''
+		try: print 'IterativeApproach weightMC   \t',prob['3m'],rt_dat['3m']
+		except: print ''
+		try: print 'literalWMC edgeRR            \t',prob['1e'],rt_dat['1e']
+		except: print ''
+		try: print 'literalWMC messageRR         \t',prob['1m'],rt_dat['1m']
+		except: print ''
 		try: print 'monte_carlo edgeRR           \t',prob['2e'],rt_dat['2e']
-		except: pass
+		except: print ''
 		try: print 'monte_carlo thread edgeRR    \t',prob['2et'],rt_dat['2et']
-		except: pass
+		except: print ''
 		try: print 'monte_carlo messageRR        \t',prob['2m'],rt_dat['2m']
-		except: pass
+		except: print ''
 		try: print 'monte_carlo thread messageRR \t',prob['2mt'],rt_dat['2mt']
-		except: pass
+		except: print ''
 		print ''
 		print ''
 
@@ -1544,9 +1554,6 @@ if __name__ == '__main__':
 
 	# filename='{}-{}-{}-{}-{}-{}.setting'.format(n,m,e,t,k,l)
 	filename="settings.curr"
-
-	# Remove old Schedules
-	clearFolder("schedules/")
 
 	exit_status = main(n,m,e,t,l,
 		k_crashes=k,filename=filename, save=save, load=load, optimize=optimize,

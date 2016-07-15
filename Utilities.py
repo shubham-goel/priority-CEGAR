@@ -677,7 +677,7 @@ def literal_to_number(literal,record_wv_mapping=False):
 	else:
 		return (lit_num)
 
-def save_DIMACS_to_file(dimacs, filename, weight_vars=None):
+def save_DIMACS_to_file(dimacs, filename, weight_vars=None, magnification=1):
 	num_vars = glbl_vars.variable_number-1
 	num_clauses = len(dimacs)
 	with open(filename, "w") as f:
@@ -690,14 +690,14 @@ def save_DIMACS_to_file(dimacs, filename, weight_vars=None):
 			for wv in weight_vars:
 				try:
 					lit_num = glbl_vars.weight_vars_to_number[wv.name]
-					if wv.weight == 0:
-						weight_vars_data.append('{} 0\n'.format(-1*lit_num))
-					else:
-						weight_vars_data.append('w {} {}\n'.format(lit_num,wv.weight))
-					if wv.weight == 1:
-						weight_vars_data.append('{} 0\n'.format(lit_num))
-					else:
-						weight_vars_data.append('w {} {}\n'.format(-1*lit_num,1-wv.weight))
+					# if wv.weight == 0:
+					# 	weight_vars_data.append('{} 0\n'.format(-1*lit_num))
+					# else:
+					weight_vars_data.append('w {} {}\n'.format(lit_num,wv.weight))
+					# if wv.weight == 1:
+					# 	weight_vars_data.append('{} 0\n'.format(lit_num))
+					# else:
+					weight_vars_data.append('w {} {}\n'.format(-1*lit_num,magnification-wv.weight))
 					lit_weights_written.append(lit_num)
 				except:
 					raise
@@ -795,13 +795,13 @@ def process_weightMC_output(sol_file):
 	return numSols
 
 def set_weight_vars(stng, s, M, t,precision=0,
-	p_omissions=0,p_crashes=0,p_delays=0):
+	p_omissions=0,p_crashes=0,p_delays=0,magnification=1):
 	normalization_factor = 1
 	weight_vars = []
-	p_omissions1 = reduce_precision(p_omissions,precision)
-	p_omissions2 = reduce_precision(1/(2-p_omissions),precision)
-	p_crashes1 = reduce_precision(p_crashes,precision)
-	p_crashes2 = reduce_precision(1/(2-p_crashes),precision)
+	p_omissions1 = reduce_precision(p_omissions,precision)*magnification
+	p_omissions2 = reduce_precision(1/(2-p_omissions),precision)*magnification
+	p_crashes1 = reduce_precision(p_crashes,precision)*magnification
+	p_crashes2 = reduce_precision(1/(2-p_crashes),precision)*magnification
 	for e in stng.g.E:
 		for i in range(t):
 
@@ -823,7 +823,7 @@ def set_weight_vars(stng, s, M, t,precision=0,
 				s.add(And(used,stng.vars.omit(e,i)) == omit1.var)
 				s.add(And(Not(used),Not(stng.vars.omit(e,i))) == omit2.var)
 
-				normalization_factor *= (1-p_omissions1)*p_omissions2
+				normalization_factor *= (magnification-p_omissions1)*p_omissions2
 
 			if p_crashes>0:
 				# Crash Weight Variables
@@ -845,7 +845,7 @@ def set_weight_vars(stng, s, M, t,precision=0,
 					s.add(crash1.var == And(stng.vars.crash(e,i),Not(stng.vars.crash(e,i-1))))
 					s.add(crash2.var == And(stng.vars.crash(e,i),(stng.vars.crash(e,i-1))))
 
-					normalization_factor *= (1-p_crashes1)*p_crashes2
+					normalization_factor *= (magnification-p_crashes1)*p_crashes2
 
 	return weight_vars,normalization_factor
 
