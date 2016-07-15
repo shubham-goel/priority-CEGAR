@@ -21,10 +21,21 @@ from Constraints import *
 from AdverserialModel import *
 
 def count_WFS(stng, pr, M, t, l,
-	k_omissions=0,k_crashes=0,k_delays=0):
+	k_crashes=0,k_omissions=0,k_delays=0):
 	'''
-	Count number of fault sequence that performs at most k faults
-	and in which less than l messages arrive
+	NOT USED for Scoring
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param k_crashes: maximum number of edges that crash
+	:param k_omissions: maximum number of edges that omit
+	:param k_delays: (must be 0) maximum number of edges that delay
+
+	:return: the number of at most k crash fault sequences with BAD outcome
+
+	Less than l messages arrive in a BAD outcome
 	'''
 	s = Solver()
 
@@ -54,7 +65,19 @@ def count_WFS(stng, pr, M, t, l,
 def weightMC(stng, pr, M, t, l,epsilon=0.01,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
-	Returns the approximate probability of pr failing, given the crash parameters
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: (must be m) minimum number of messages that should arrive on time
+	:param epsilon: the maximum desired uncertainity
+	:param p_omissions: (must be 0) omission probability
+	:param p_crashes: crash probability
+	:param p_delays: (must be 0) delay probability
+
+	:return: Approximate score of pr, within uncertainity epsilon
+
+	This uses a distribution-aware-sampling approximate WMC tool
 	'''
 	print ''
 	print '###############################################'
@@ -100,7 +123,7 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 	start_time=0
 	func_start_time=time.time()
 
-	print_time('STARTING successProb Iterations')
+	print_time('STARTING weightMC Iterations')
 	while True:
 		# count_time = end_time-start_time
 		# print "Time taken = {}".format(count_time)
@@ -160,8 +183,10 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 			weightMC_numSols=0
 			weightMC_time=rt_dat['z3 check'][k_crashes]
 
-		# =================================
-
+		# =======================================
+		# Uncomment this block to compare the approximation with
+		# the answer returned by the literal WMC approach
+		# ============Block Start================
 
 		# t3=print_time("converting to unweighted...")
 		# denom = wieghted_to_unweighted(stng,s,weight_vars,t,
@@ -210,7 +235,8 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 		# print "\n\nWMC method:"+str(prob),weightMC_time
 		# print "WeightMC method:"+str(weightMC_numSols),sharpSAT_time,'\n\n'
 
-		# ==========================================
+		# ============Block End================
+
 		if weightMC_numSols == 'timeout':
 			print "Timeout"
 			print_time('RETURNING weightMC...')
@@ -249,19 +275,46 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 	print ''
 	return (lower_bound,upper_bound),rt_dat
 
-def successProb(stng, pr, M, t, l,optimize=False,naive=True,
+def IterativeApproach(stng, pr, M, t, l,distinct_crashes=True,optimize=False,
 	p_omissions=0,p_crashes=0,p_delays=0):
 	'''
-	Returns the probability of pr failing, given the crash parameters
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: (must be m) minimum number of messages that should arrive on time
+	:param distinct_crashes: all crashes do NOT occur simultaneously, z3 Based
+	:param optimize: use doomed state optimization. Works with distinct_crashes only
+	:param p_omissions: (must be 0) omission probability
+	:param p_crashes: crash probability
+	:param p_delays: (must be 0) delay probability
+
+	:return: Score of priority scheme
+
+	The  number of crashes is fixed to k,
+	the corresponding score is calculated for successive values of k.
+
+	distinct_crashes=True
+		The score is calculated by iterating (using z3) over
+		all crash sequences that lead to BAD outcomes,
+		and subtracting their probability from the score.
+
+		When optimize=True,
+			A dommed state optimization is used.
+			Not all BAD outcomed crash sequences are iterated over.
+
+	distinct_crashes=False
+		The entire state space of k crashes occuring is not explored
+		The space is limited to when all k crashes occur simultaneously
 	'''
 	print ''
 	print '###############################################'
 	print '###############################################'
-	print_time('RUNNING successProb...')
+	print_time('RUNNING IterativeApproach...')
 	print ''
-	print 'optimize={}\nnaive={}\np_omissions={}\np_crashes={}'.format(optimize,naive,p_omissions,p_crashes)
+	print 'optimize={}\ndistinct_crashes={}\np_omissions={}\np_crashes={}'.format(optimize,distinct_crashes,p_omissions,p_crashes)
 	print ''
-	if naive:
+	if distinct_crashes:
 		s = Solver()
 	else:
 		s = myGoal()
@@ -307,7 +360,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 	start_time=0
 	func_start_time=time.time()
 
-	print_time('STARTING successProb Iterations')
+	print_time('STARTING IterativeApproach Iterations')
 	while True:
 		count_time = end_time-start_time
 		print "Time taken = {}".format(count_time)
@@ -334,7 +387,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 
 		start_time = time.time()
 
-		if naive:
+		if distinct_crashes:
 
 			print 'Adding k_maxSimulationConstraints...',time.time()
 			st_time=time.time()
@@ -354,7 +407,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 
 			if p1 =='Timeout':
-				print_time('successProb Timeout...')
+				print_time('IterativeApproach Timeout...')
 				print '###############################################'
 				print '###############################################'
 				print ''
@@ -376,7 +429,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 			for fail_at in range(t):
 
 				if time.time() - start_time > glbl_vars.timeout_limit:
-					print_time('successProb Timeout...')
+					print_time('IterativeApproach Timeout...')
 					print '###############################################'
 					print '###############################################'
 					print ''
@@ -430,7 +483,7 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 					approxMC_mis_time='timeout'
 				# -----------------------------------------------
 
-				# Run only MIS on file---------------------------
+				# Run only ApproxMC on file---------------------------
 				print_time("\nrunning approxMC on file...")
 				numSols_approxMC,approxMC_time=run_approxMC(cnf_file)
 				# -----------------------------------------------
@@ -504,13 +557,13 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 					print (lower_bound,upper_bound)
 
 				elif numSols == 'timeout':
-					print_time('successProb Timeout...')
+					print_time('IterativeApproach Timeout...')
 					print '###############################################'
 					print '###############################################'
 					print ''
 					return ((lower_bound,upper_bound),'Timeout'),rt_dat
 				elif numSols == 'error':
-					print_time('successProb error...')
+					print_time('IterativeApproach error...')
 					print '###############################################'
 					print '###############################################'
 					print ''
@@ -530,25 +583,34 @@ def successProb(stng, pr, M, t, l,optimize=False,naive=True,
 		k_crashes=k_crashes+1
 		k_delays=0
 
-	print_time('RETURNING successProb...')
+	print_time('RETURNING IterativeApproach...')
 	print '###############################################'
 	print '###############################################'
 	print ''
 	return (lower_bound,upper_bound),rt_dat
 
-def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
+def literalWMC(stng, pr, M, t, l,precision=0,
 	p_omissions=0,p_crashes=0,p_delays=0, RR='message'):
 	'''
-	Serves the same purpose as successProb
-	Returns the probability of pr failing, given the crash parameters
-	Implements a MessageRR Algorithm
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: (must be m) minimum number of messages that should arrive on time
+	:param precision: fault probabilities are expressed using precision bits
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
+	:param p_delays: (must be 0) delay probability
+	:param RR: 'edge'/'message' specify the forwarding algorithm to be used
+
+	:return: Score of priority scheme, calculated using literal WMC (and #SAT)
 	'''
 	print ''
 	print '###############################################'
 	print '###############################################'
-	print_time('RUNNING priorityScore...')
+	print_time('RUNNING literalWMC...')
 	print ''
-	print 'optimize={}\nprecision={}\np_omissions={}\np_crashes={}\np_delays={}\nRR={}'.format(optimize,precision,p_omissions,p_crashes,p_delays,RR)
+	print 'precision={}\np_omissions={}\np_crashes={}\np_delays={}\nRR={}'.format(precision,p_omissions,p_crashes,p_delays,RR)
 	print ''
 	assert l==len(M)
 
@@ -613,7 +675,7 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 		print "\n"
 
 	print ''
-	t8=print_time('RETURNING priorityScore...')
+	t8=print_time('RETURNING literalWMC...')
 
 	st_time=time.time()
 	rt_dat['generate program'] = t2-t1
@@ -633,6 +695,21 @@ def priorityScore(stng, pr, M, t, l,optimize=False,precision=0,
 def monte_carlo_Score(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge'):
+	'''
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
+	:param p_delays: (must be 0) delay probability
+	:param epsilon: the maximum allowed error in the returned score
+	:param confidence: the confidence with which the score is reported
+	:param RR: 'edge'/'message' specify the forwarding algorithm to be used
+
+	:return: Score of priority scheme, calculated using monte-carlo simulations
+	'''
 	print ''
 	print '###############################################'
 	print '###############################################'
@@ -690,6 +767,22 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	epsilon=0.2,confidence=0.8,RR='edge',
 	num_threads = 4):
+	'''
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
+	:param p_delays: (must be 0) delay probability
+	:param epsilon: the maximum allowed error in the returned score
+	:param confidence: the confidence with which the score is reported
+	:param RR: 'edge'/'message' specify the forwarding algorithm to be used
+	:param num_threads: the number of concurrent threads to be spawned
+
+	:return: Score of priority scheme, calculated using monte-carlo simulations
+	'''
 	print ''
 	print '###############################################'
 	print '###############################################'
@@ -760,6 +853,22 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 
 def rand_sim_EdgeRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
+	'''
+	:param output_dict: a dictionary to store results in
+	:param num_iter: the number of iterations to be run
+	:param id_thread: id of this thread
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
+
+	:return: Score of priority scheme, calculated using monte-carlo simulations
+
+	This uses the Edge Round robin forwarding algorithm
+	'''
 	successful_iter = 0
 
 	start_time = time.time()
@@ -783,6 +892,22 @@ def rand_sim_EdgeRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout,
 
 def rand_sim_MessageRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
+	'''
+	:param output_dict: a dictionary to store results in
+	:param num_iter: the number of iterations to be run
+	:param id_thread: id of this thread
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
+
+	:return: Score of priority scheme, calculated using monte-carlo simulations
+
+	This uses the Message Round robin forwarding algorithm
+	'''
 	successful_iter = 0
 
 	start_time = time.time()
@@ -806,7 +931,19 @@ def rand_sim_MessageRR_thread(output_dict,num_iter,id_thread, stng, pr, M, timeo
 
 def rand_sim_EdgeRR(stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
+	'''
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param timeout: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
 
+	:return: weather a random simulation was successful or not
+
+	This uses edge round robin forwarding algorithm
+	'''
 	sim_vars = Sim_Vars()
 
 	for e in stng.g.E:
@@ -896,6 +1033,19 @@ def rand_sim_EdgeRR(stng, pr, M, timeout, l,
 
 def rand_sim_MessageRR(stng, pr, M, timeout, l,
 	p_omissions=0,p_crashes=0):
+	'''
+	:param stng: setting
+	:param pr: priority scheme
+	:param M: set of messages
+	:param timeout: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
+
+	:return: weather a random simulation was successful or not
+
+	This uses message round robin forwarding algorithm
+	'''
 
 	sim_vars = Sim_Vars()
 
@@ -955,6 +1105,24 @@ def saboteurProbability(stng,s,pr,M,t,l,
 	k_omissions=0,k_crashes=0,k_delays=0,
 	p_omissions=0,p_crashes=0,p_delays=0,
 	optimize=False):
+	'''
+	:param stng: setting
+	:param s: solver
+	:param pr: priority scheme
+	:param M: set of messages
+	:param t: global timeout
+	:param l: minimum number of messages that should arrive on time
+	:param k_crashes: exact number of edges that crash
+	:param k_omissions: exact number of edges that omit
+	:param k_delays: (must be 0) exact number of edges that delay
+	:param p_omissions: omission probability
+	:param p_crashes: crash probability
+	:param p_delays: delay probability
+	:param optimize: use doomed state optimizations
+
+	:return: the joint probability of BAD outcomes, k crashes
+
+	'''
 
 	checkSupport(k_omissions=k_omissions,k_crashes=k_crashes,k_delays=k_delays)
 
@@ -1001,9 +1169,11 @@ def saboteurProbability(stng,s,pr,M,t,l,
 def get_doomed_state(stng, crash_model, pr, M, t, l,
 	k_omissions=0,k_crashes=0,k_delays=0):
 	'''
-	Returns the smallest time t such that the configuration at t is doomed
-	All crash models which follow crash_model till time t and have k crashes
-	result in <l messages to be delivered
+	:param: parameters have usual meanings
+	:returns: the smallest time t such that the configuration at t is doomed
+	All crash sequences which follow crash_model till time t
+	and have a total of k crashes will lead to a BAD outcome where
+	number of messages delivered on time < l
 	'''
 	st0=time.time()
 	sOpt = Solver()
@@ -1041,10 +1211,11 @@ def CEGAR(stng, M, t, l,
 	optimize=False, showProgress=False, countFaults=False,
 	probabalistic=False,load_priority=False,save_priority=False):
 	'''
-	:param M: The messages to be sent
-	:param t: The timeout.
-	:param l: At least l messages should arrive.
-	:return: A (k,l)-resistant schedule, if it exists, and otherwise False.
+	:param countFaults: a count of BAD outcomed crash sequences is returned
+	:param probabalistic: the score of a priority scheme is returned
+	:param load_priority: a previously saved priority scheme is loaded
+	:param save_priority: the priority scheme generated is saved
+	:return: Depends on the arguments
 	'''
 	#redundant: j = 1
 	#redundant: counter=1
@@ -1120,6 +1291,7 @@ def CEGAR(stng, M, t, l,
 		rt_dat = {}
 		rt_dat['timing_time'] = 0
 
+		# Here, Select the tools you wish to calulate probability with
 		run = {}
 		run['incremental k, z3-based naive counting']=True
 		run['incremental k, z3-based naive counting, optimized']=True
@@ -1136,19 +1308,19 @@ def CEGAR(stng, M, t, l,
 
 		if run['incremental k, simultaneous crashes, bit-adder']:
 			t1=time.time()
-			prob['0b'],rt_dat['0b_inner']=successProb(stng, pr, M, t, l,optimize=optimize,naive=False,
+			prob['0b'],rt_dat['0b_inner']=IterativeApproach(stng, pr, M, t, l,optimize=optimize,naive=False,
 				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 			rt_dat['0b']=time.time()-t1
 
 		if run['incremental k, z3-based naive counting']:
 			t1=time.time()
-			prob['0a'],rt_dat['0a_inner']=successProb(stng, pr, M, t, l,optimize=False,naive=True,
+			prob['0a'],rt_dat['0a_inner']=IterativeApproach(stng, pr, M, t, l,optimize=False,naive=True,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 			rt_dat['0a']=time.time()-t1
 
 		if run['incremental k, z3-based naive counting, optimized']:
 			t1=time.time()
-			prob['0o'],rt_dat['0o_inner']=successProb(stng, pr, M, t, l,optimize=True,naive=True,
+			prob['0o'],rt_dat['0o_inner']=IterativeApproach(stng, pr, M, t, l,optimize=True,naive=True,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays)
 			rt_dat['0o']=time.time()-t1
 			rt_dat['doomed_state_timing'] = glbl_vars.doomed_state_rt
@@ -1161,14 +1333,14 @@ def CEGAR(stng, M, t, l,
 
 		if run['WMC EdgeRR']:
 			t1=time.time()
-			prob['1e'],rt_dat['1e_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+			prob['1e'],rt_dat['1e_inner']=literalWMC(stng, pr, M, t, l,optimize=optimize,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='edge')
 			rt_dat['1e']=time.time()-t1
 
 		if run['WMC MessageRR']:
 			t1=time.time()
-			prob['1m'],rt_dat['1m_inner']=priorityScore(stng, pr, M, t, l,optimize=optimize,precision=precision,
+			prob['1m'],rt_dat['1m_inner']=literalWMC(stng, pr, M, t, l,optimize=optimize,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='message')
 			rt_dat['1m']=time.time()-t1
@@ -1206,17 +1378,17 @@ def CEGAR(stng, M, t, l,
 		print ''
 		print '#Final Probabilities:'
 		print ''
-		try: print 'successProb bit-adder        \t',prob['0b'],rt_dat['0b']
+		try: print 'IterativeApproach bit-adder        \t',prob['0b'],rt_dat['0b']
 		except: pass
-		try: print 'successProb NO OPT           \t',prob['0a'],rt_dat['0a']
+		try: print 'IterativeApproach NO OPT           \t',prob['0a'],rt_dat['0a']
 		except: pass
-		try: print 'successProb OPT              \t',prob['0o'],rt_dat['0o']
+		try: print 'IterativeApproach OPT              \t',prob['0o'],rt_dat['0o']
 		except: pass
-		try: print 'successProb weightMC         \t',prob['3m'],rt_dat['3m']
+		try: print 'IterativeApproach weightMC         \t',prob['3m'],rt_dat['3m']
 		except: pass
-		try: print 'priorityScore edgeRR         \t',prob['1e'],rt_dat['1e']
+		try: print 'literalWMC edgeRR         \t',prob['1e'],rt_dat['1e']
 		except: pass
-		try: print 'priorityScore messageRR      \t',prob['1m'],rt_dat['1m']
+		try: print 'literalWMC messageRR      \t',prob['1m'],rt_dat['1m']
 		except: pass
 		try: print 'monte_carlo edgeRR           \t',prob['2e'],rt_dat['2e']
 		except: pass
