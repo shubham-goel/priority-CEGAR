@@ -168,7 +168,8 @@ def query_yes_no(question, default="yes"):
 							 "(or 'y' or 'n').\n")
 
 def parse_arguments():
-	parser = OptionParser()
+	usage = "usage: %prog [options] nodes messages edges timeout l k"
+	parser = OptionParser(usage=usage)
 	# parser.add_option('-t','--timeout', dest="t",
 	# 			  help="The timeout, should be an integer")
 	# parser.add_option("-l", dest="l",
@@ -184,28 +185,28 @@ def parse_arguments():
 
 	parser.add_option("-l","--load",
 				  action="store_true", dest="load", default=False,
-				  help="Load setting from file")
+				  help="Load setting from pickle-dumped file 'settings.curr'")
 	parser.add_option("-m","--manual","--custom",
 				  action="store_true", dest="custom", default=False,
-				  help="Load setting from custom file")
-	parser.add_option("-b","--brute",
-				  action="store_false", dest="optimize", default=True,
-				  help="Dont Optimize")
-	parser.add_option("-v","--verbose",
-				  action="store_true", dest="showProgress", default=False,
-				  help="Dont show progress")
+				  help="Load setting from custom file 'custom.settings'")
+	# parser.add_option("-b","--brute",
+	# 			  action="store_false", dest="optimize", default=True,
+	# 			  help="Dont Optimize")
+	# parser.add_option("-v","--verbose",
+	# 			  action="store_true", dest="showProgress", default=False,
+	# 			  help="Dont show progress")
 	parser.add_option("--nw","--no-weight",
 				  action="store_false", dest="weight", default=True,
 				  help="Choose paths without weights")
-	parser.add_option("-d","--no-diff",
-				  action="store_true", dest="diff", default=False,
-				  help="Check if schedules generated are different")
+	# parser.add_option("-d","--no-diff",
+	# 			  action="store_true", dest="diff", default=False,
+	# 			  help="Check if schedules generated are different")
 	parser.add_option("-c","--count",
 				  action="store_true", dest="countFaults", default=False,
-				  help="Counts number of Saboteur winning stratergies given Schedule")
+				  help="Count the numer of BAD outcomed fault sequences with at most k crashes")
 	parser.add_option("-p","--prob",
 				  action="store_true", dest="probabalistic", default=False,
-				  help="Calculates probability of winning given Runner Stratergy (Priorities)")
+				  help="Score the forwarding scheme that is generated for the setting")
 	return parser.parse_args()
 
 def clearFolder(folder):
@@ -336,6 +337,25 @@ def reduce_precision(p,precision):
 			number += power
 	return number
 
+def help():
+	print '''
+	USAGE:
+	$ python ScheduleTwoPathCEGAR.py n m e t l k [options]
+
+		n    Number of Nodes
+		m    Number of Messages
+		e    Number of Edges
+		t    Global timeout
+		l    The minimum number of messages that should reach on time
+		k    The number of edge crashes (Not relevent for scoring forwarding schemes with option --prob)
+
+	OPTIONS:
+		--prob   -p  Score the forwarding scheme that is generated for the setting
+		--count  -c  Count the numer of BAD outcomed fault sequences with at most k crashes
+		--load   -l  Load setting from pickle-dumped file 'settings.curr'
+		--manual -m  Load setting from custom text file 'custom.setting'. Explained in detail later
+		--custom     The same as --manual
+	'''
 
 ##########
 # PRINTING
