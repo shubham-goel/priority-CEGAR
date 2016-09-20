@@ -7,7 +7,7 @@ def init():
 	global float_dec2bin_dict
 	global timeout_limit
 	global timeout_limit_small
-	timeout_limit = 2400
+	timeout_limit = 3600
 	timeout_limit_small = 120
 	variable_number = 1
 	variable_name_to_number = {}
@@ -22,3 +22,11 @@ def init_doomed_rt():
 	doomed_state_rt['solving'] = 0
 	doomed_state_rt['excluding'] = 0
 	doomed_state_rt['total'] = 0
+
+def init_heuristics(list_heuristics):
+	global heuristics
+	heuristics = list_heuristics
+
+def init_weight_vars_to_number():
+	global weight_vars_to_number
+	weight_vars_to_number = {}

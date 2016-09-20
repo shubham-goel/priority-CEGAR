@@ -67,6 +67,14 @@ local/*
 */local/*
 *.curr
 schedules/*
-umc*
 output*
-umc_dimacs*
+*dimacs*
+*num_sols*
+*temp*
+*log*
+test.py
+
+#Important Binaries
+scalmc
+sharpSAT
+weightmc
