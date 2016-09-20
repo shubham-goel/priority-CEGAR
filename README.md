@@ -6,7 +6,7 @@ A wide vareity of tools have been incorporated into the code. We can choose what
 
 ```
 USAGE:
-$ python ScheduleTwoPathCEGAR.py n m e t l k [options]
+$ python ScheduleTwoPathsCEGAR.py n m e t l k [options]
 
   n                     Number of Nodes
   m                     Number of Messages
