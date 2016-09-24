@@ -281,30 +281,155 @@
 
 
 \section{Computational complexity}
-	We study the computational complexity of scoring forwarding scheme. We study a variant in which some edges are known to never crash. We show that scoring can be reduced to counting a polynomial-sized SAT formula (similar to the reduction in Theorem~\ref{thm:literal WMC}), thus the problem is in $P^{\#P}$ and in turn in PSPACE. 
+	We study the computational complexity of scoring forwarding scheme. We study a variant in which some edges are known to never crash. We show that scoring can be reduced to counting a polynomial-sized SAT formula (similar to the reduction in Theorem~\ref{thm:literal WMC}), thus the problem is in $P^{\#P}$ and in turn in PSPACE.
 	% For the lower bound, we first study the complexity of the adversarial case, which was not studied in \cite{AGN16}. We consider the problem of deciding the existence of a ``bad'' fault sequence. Formally, we consider the problem of deciding whether there is a set of edges of size at most $k$ that all crash at time $0$ and guarantee that less than $\ell$ messages arrive on time. We show that the problem is NP-Complete. We then use the reduction in the probabilistic setting to show NP-hardness of the scoring problem.
 
-	We also show that counting a CNF Formula can be reduced to ``scoring'' a forwarding scheme. Given a CNF formula $\psi$, we construct a network and a set of messages to be sent across it such that the number of satisfying assignment of $\psi$ equals $(1-Score)\times 2^m$ (where $m$ is the number of variables in $\psi$). This network will only be susceptible to crashes, and all edges shall crash with a fixed probability of either $0$ or $0.5$. For every boolean variable $x$ and every clause $C$ in $\psi$, we define a {\it variable} message $m_x$ and a {\it clause} message $m_C$ respectively in our network. Hence, if $\psi$ contains $m$ variables and $l$ clauses, the network will contain $(m+l)$ messages. Depending on the crashes that occur, each {\it Variable} message $m_x$ takes one of 2 possible message paths: $p_{x}$ or $p_{\neg x}$ to reach its target. 
+	We also show that counting a 3-CNF Formula can be reduced to ``scoring'' a forwarding scheme. Given a 3-CNF formula $\psi$, we construct a network and a set of messages to be sent across it such that the number of satisfying assignment of $\psi$ equals $(1-Score)\times 2^m$ (where $m$ is the number of variables in $\psi$). This network will only be susceptible to crashes, and all edges shall crash with a fixed probability of either $0$ or $0.5$. For every boolean variable $v$ and every clause $C$ in $\psi$, we define a {\it variable} message $m_v$ and a {\it clause} message $m_C$ respectively in our network. Hence, if $\psi$ contains $m$ variables and $l$ clauses, the network will contain $(m+l)$ messages. Depending on the crashes that occur, each {\it Variable} message $m_v$ takes one of 2 possible message paths: $p_v$ or $p_{\neg v}$ to reach its target.
 
-	We establish a one-one correspondence between every crash sequence $\zeta$ and every variable assignment $\sigma$. This correspondence is such that $m_x$ travels on $p_{x}$ {\it iff} $\sigma(x) = \tt$. Figure~\ref{fig:complexity} shows how this is done. In the entire network, only the first edge of $p_{x}$ and $p_{\neg x}$ are allowed to crash (with a probability of $0.5$). All other edges have a {\it zero} probability of crashing. So, variable messages travel on one of their two paths with equal probability.
+	We establish a one-one correspondence between every crash sequence $\zeta$ and every variable assignment $\sigma$. This correspondence is such that $m_v$ travels on $p_v$ {\it iff} $\sigma(v) = \tt$. Figure~\ref{fig:complexity} shows how this is done. In the entire network, only the first edge of $p_v$ is allowed to crash (with a probability of $0.5$). All other edges have a {\it zero} probability of crashing. So, variable messages travel on one of their two paths with equal probability.
 
 	{\bf [Figure comes here]}
 
-	We want a satisfying assignment to correspond to a ``bad'' crash sequence (less than $\lambda$ messages arrive). We shall select the value of $\lambda$ later. All the variable message arrive on time, no matter what crash sequence occurs. So, the only ``chance'' of a fault sequence to be bad is to make a clause message miss the deadline. Since crashes can't occur on such a message's path, the only chance is that a variable message gets in its way. The length of a clause message path is exactly $t$, the global timeout. We construct the network such that a clause message $m_C$ can only be delayed by a variable message $m_x$ if $C$ contains $x$ and the crash sequence corresponds to an assignment of $x$ that satisfies $C$. Hence, a clause message can be delayed only in a crash sequence that corresponds to an assignment that satisfies it. All clause messages can be delayed only by crash sequences that correspond to assignments that satisfy $\psi$.
+	We want a satisfying assignment to correspond to a ``bad'' crash sequence (less than $\lambda$ messages arrive). We shall select the value of $\lambda$ later. All the variable message arrive on time, no matter what crash sequence occurs. So, the only ``chance'' of a fault sequence to be bad is to make a clause message miss the deadline. Since crashes can't occur on such a message's path, the only chance is that a variable message gets in its way. The length of a clause message path is exactly $t$, the global timeout. We construct the network such that a clause message $m_C$ can only be delayed by a variable message $m_v$ if $C$ contains $v$ and the crash sequence corresponds to an assignment of $v$ that satisfies $C$. Hence, a clause message can be delayed only in a crash sequence that corresponds to an assignment that satisfies it. All clause messages can be delayed only by crash sequences that correspond to assignments that satisfy $\psi$.
 
-	We can also synchronize all clause and variable messages by manipulating path lengths and using redundant edges such that a variable message $m_x$ travelling on $p_{x}$ will delay all (previously undelayed) clause messages $m_C$ where $x \models C$. Similarly, variable messages $m_x$ travelling on $p_{\neg x}$ will delay clause messages $m_C$ where $\neg x \models C$. This can be done by merely ensuring that both $m_x$ and $m_C$ are present in the queue of some common vertex in their path at the same time. All variable messages are assigned a higher priority than clause messages to delay these clause messages.
-	Hence, a crash sequence assigning $x = \tt$ will cause $m_x$ to travel on $p_{x}$ and delay all clause messages $m_C$ where $x \models C$. Similarly, crash sequence assigning $x = \ff$ will delay clause messages $m_C$ where $\neg x \models C$. Therefore, crash sequences corresponding to assignments satisfying $\psi$ will delay all clause messages. 
+	We can also synchronize all clause and variable messages by manipulating path lengths and using redundant edges such that a variable message $m_v$ travelling on $p_v$ will delay all (previously undelayed) clause messages $m_C$ where $v \models C$. Similarly, variable messages $m_v$ travelling on $p_{\neg v}$ will delay clause messages $m_C$ where $\neg v \models C$. This can be done by merely ensuring that both $m_v$ and $m_C$ are present in the queue of some common vertex in their path at the same time. All variable messages are assigned a higher priority than clause messages to delay these clause messages.
+	Hence, a crash sequence assigning $v = \tt$ will cause $m_v$ to travel on $p_v$ and delay all clause messages $m_C$ where $v \models C$. Similarly, crash sequence assigning $v = \ff$ will delay clause messages $m_C$ where $\neg v \models C$. Therefore, crash sequences corresponding to assignments satisfying $\psi$ will delay all clause messages.
 
 	As all clause messages will be delayed {\it iff} the crash sequence corresponds to an assignment satisfying $\psi$, we set $\lambda = m+1$ (variable messages always arrive on time). Now, a crash sequence is bad {\it iff} at most $m$ messages arrive i.e. all clause messages are delayed i.e. the crash sequence corresponds to an assignment satisfying $\psi$.
 
-	% Each clause message's path intersects exactly one of the message paths of every variable it contains, depending on whether the variable appears as a positive literal or a negative one. Clause message $m_C$'s path intersects $p_{x}$ if $x$ appears as a positive literal in $C$, similarly for $p_{\neg x}$.
+	% Each clause message's path intersects exactly one of the message paths of every variable it contains, depending on whether the variable appears as a positive literal or a negative one. Clause message $m_C$'s path intersects $p_x$ if $x$ appears as a positive literal in $C$, similarly for $p_{\neg x}$.
 
 	% If $\sigma \models \psi$ corresponds to the crash sequence $\zeta$, then $\zeta$ leads to a {bad} outcome where no {\it Clause} message arrives at its destination on time.
 
-	% Unlike the {\it Variable} messages, each clause message $m_C$ has a fixed path which it always travels on. This intersects with one of the message paths of every variable it contains, depending on whether the variable appears as a positive literal or a negative one. Clause message $m_C$'s path intersects $p_{x}$ if $x$ appears as a positive literal in $C$, similarly for $p_{\neg x}$. All {\it Variable} messages are set to have a higher priority than all {\it Clause} messages. This ensures that whenever a {\it Variable} and a {\it Clause} message appear in the same vertex queue, the {\it Clause} message gets delayed. All messages are carefully synchronized using redundant edges such that a {\it Variable} message $m_x$ travelling on $p_{\neg x}$ always delays an intersecting and previously undelayed {\it Clause} message by making it wait at the vertex at which the intersection occurs. Further, the total length of the paths of each {\it Clause} messages equals the global timeout $t$. Hence, delayed {\it Clause} messages do not reach on time. Also note that only `satisfied' {\it Clause} messages are delayed and path lengths of the {\it Variable} messages are made arbitrarily long to prevent them from ever reaching their destination. It is evident by now, how and why the one-one correspondence works.
+	% Unlike the {\it Variable} messages, each clause message $m_C$ has a fixed path which it always travels on. This intersects with one of the message paths of every variable it contains, depending on whether the variable appears as a positive literal or a negative one. Clause message $m_C$'s path intersects $p_x$ if $x$ appears as a positive literal in $C$, similarly for $p_{\neg x}$. All {\it Variable} messages are set to have a higher priority than all {\it Clause} messages. This ensures that whenever a {\it Variable} and a {\it Clause} message appear in the same vertex queue, the {\it Clause} message gets delayed. All messages are carefully synchronized using redundant edges such that a {\it Variable} message $m_x$ travelling on $p_{\neg x}$ always delays an intersecting and previously undelayed {\it Clause} message by making it wait at the vertex at which the intersection occurs. Further, the total length of the paths of each {\it Clause} messages equals the global timeout $t$. Hence, delayed {\it Clause} messages do not reach on time. Also note that only `satisfied' {\it Clause} messages are delayed and path lengths of the {\it Variable} messages are made arbitrarily long to prevent them from ever reaching their destination. It is evident by now, how and why the one-one correspondence works.
 
-	The one-one correspondence shows that the number of satisfying assignments to $\psi$ equals the number of unsuccessful crash sequences (which lead to a bad outcome). Lastly, as each crash sequence has a constant probability of occuring ($2^{-m}$), where $m$ is the number of {\it Variable} messages, the $Score$ of the forwarding scheme is related to the SAT count ($\#SAT$) as $$(1-Score)\times 2^m = \# SAT$$
-	
+	The one-one correspondence shows that the number of satisfying assignments to $\psi$ equals the number of successful crash sequences (which lead to a bad outcome). Lastly, as each crash sequence has a constant probability of occuring ($2^{-m}$), the $Score$ of the forwarding scheme is related to the SAT count ($\#SAT$) as $$(1-Score)\times 2^m = \# SAT$$
+
+	\subsection{Counting to Scoring}
+
+		Given 3-CNF formula \psi, let $\C$ be its set of clauses and $\chi$ be the set of variables in \psi. Further, denote by $p_{crash}(e)$ the probability of some edge $e$ crashing. We now formalize the reduction of $\psi$ to a network.
+
+		\begin{definition} For each clause $C \in \C$, let $C(0), C(1), C(2)$ denote the literals present in $C$.
+		\end{definition}
+
+		\noindent {\em The Graph}:
+
+		For each variable $v \in \chi$, we add to the graph $2t$ nodes and $2t$ edges. Here, $t$ is the gloabal timeout of the network, which we will decide later.
+		\begin{itemize}
+		\item Nodes:  $\set{{p_v}_i : 0 \leq i \leq t} \cup \set{{p_{\neg v}}_i : 1 \leq i \leq t-1}$
+		\item Edges:  $\set{({p_v}_i,{p_v}_{i+1}) : 0 \leq i < t} \cup \set{({p_{\neg v}}_i,{p_{\neg v}}_{i+1}) : 1 \leq i < t}  \cup \set{({p_v}_0,{p_{\neg v}}_1),({p_{\neg v}}_{t-1},{p_v}_t)}$
+		\end{itemize}
+		% \noindent These nodes and edges $2$ ``message'' paths for each variable:  $p_v = {p_v}_0 \ {p_v}_1 \ {p_v}_2 \ \ldots \ {p_v}_t$ and ${p_{\neg v} = p_v}_0 \ {p_{\neg v}}_1 \ {p_{\neg v}}_2 \ \ldots \ {p_{\neg v}}_{t-1} \ {p_v}_t$. Here, $t$ is the global timeout, the value of which we will decide later. Note that the paths corresponding to different messages are disjoint. For each clause $C$, we shall construct a new path $p_C$ of of length $t$ such that:
+
+		% $$\forall x \in \bigcup_{v\in \chi} \set{v,\neg v}, x \models C \Rightarrow p_C \cap p_x = ({p_x}_i,{p_x}_{i+1})$$
+
+		% If $x \models C$, $p_C$ and $p_x$ share exactly one edge $({p_x}_i,{p_x}_{i+1})$. We will additionally ensure that that $({p_x}_i,{p_x}_{i+1})$ be the ${i+1}^{th}$ edge in $p_C$. $p_C$ shall not share any edges/nodes with any clause path or message path that corresponds to a literal that doesn't lies in C.
+
+		For each clause $C \in \C$, if $C$ is the $k^{th}$ clause ($1 \leq k \leq \Vert\C\Vert$), we add to the graph $t-5$ nodes and $t-3$ edges.
+		\begin{itemize}
+		\item Nodes:  $\set{{p_C}_i : (0 \leq i \leq 6k-1) \lor (6k+6 \leq i \leq t)}$
+		\item Edges:
+			\begin{itemize}
+			\item $\set{({p_C}_i,{p_C}_{i+1}) : (0 \leq i < 6k-1) \lor (6k+6 \leq i < t)}$
+			\item $\set{({p_C}_{6k-1},{p_{C(0)}}_{6k}), ({p_{C(0)}}_{6k+1},{p_{C(1)}}_{6k+2}), ({p_{C(1)}}_{6k+3},{p_{C(2)}}_{6k+4}), ({p_{C(2)}}_{6k+5},{p_C}_{6k+6})}$
+			\end{itemize}
+		\end{itemize}
+
+		\noindent {\em The Messages}:
+
+		For every variable $v \in \chi$, we define a {\em variable} message $m_v$ with the following properties:
+		\begin{itemize}
+		\item Source $s(m_v) = {p_v}_0$, Target $t(m_v) = {p_v}_t$
+		\item Possible Paths:
+			\begin{itemize}
+			\item $p_v = {p_v}_0 \ {p_v}_1 \ {p_v}_2 \ \ldots \ {p_v}_t$
+			\item ${p_{\neg v} = p_v}_0 \ {p_{\neg v}}_1 \ {p_{\neg v}}_2 \ \ldots \ {p_{\neg v}}_{t-1} \ {p_v}_t$
+			\end{itemize}
+		\end{itemize}
+
+		For every clause $C \in \C$, we define a {\em clause} message $m_C$ with the following properties:
+		\begin{itemize}
+		\item Source $s(m_C) = {p_C}_0$, Target $t(m_C) = {p_C}_t$
+		\item Possible Path:
+			\begin{itemize}
+			\item $p_C = {p_C}_0 \ {p_C}_1 \ {p_C}_2 \ \ldots \ {p_C}_{6k-1} \ {p_{C(0)}}_{6k} \ {p_{C(0)}}_{6k+1} \ {p_{C(1)}}_{6k+2} \ {p_{C(1)}}_{6k+3} \ {p_{C(2)}}_{6k+4} \ {p_{C(2)}}_{6k+5} \ {p_C}_{6k+6} \ldots {p_C}_t$
+			\end{itemize}
+			Hence, $6(\Vert\C\Vert+1)\leq t$. We choose $t = 6(\Vert\C\Vert+1)$.
+		\end{itemize}
+
+		\noindent {\em Crash Probabilities}:
+		\[
+		    p_{crash}(e) =
+		\begin{cases}
+		    0.5,& \text{if } \exists v \in \chi: e=({p_v}_0,{p_v}_1)\\
+			    0, & \text{otherwise}
+		\end{cases}
+		\]
+		\noindent {\em Edge \& Message Priorities}:
+
+		Let $\chi(k)$ denote the $k^{th}$ variable in $\chi$, and $\C(k)$ denote the $k^{th}$ clause in $\C$.
+		% $$\forall k : 1 \leq k < \Vert\C\Vert : m_{\C(k)} > m_{\C(k+1)}$$
+		% $$\forall k : 1 \leq k < \Vert\chi\Vert : m_{\chi(k)} < m_{\chi(k+1)}$$
+		$$\forall v \in \chi: m_{\C(\Vert\C\Vert)} \prec_v \ldots \prec_v m_{\C(2)} \prec_v m_{\C(1)} \prec_v m_{\chi(1)} \prec_v m_{\chi(2)} \prec_v \ldots \prec_v m_{\chi(\Vert\chi\Vert)}$$
+		$$\forall v \in \chi: ({p_v}_0,{p_{\neg v}}_1) \prec_{m_v}^v ({p_v}_0,{p_v}_1)$$
+		We need not define edge priorities for any other message, or anywhere else, because for all clause messages and for variable messages at other vertices, there is only a single edge that the message is allowed to travel on. Now onwards, for convenience and readability, I shall loosely describe a crash (or a message travel) occuring during a time duration $[i,i+1)$ as a crash (or a message travel) occuring at time $i$. There is a one-one correlation between a crash sequence and a variable assignment \sigma.
+		$$\sigma(v) = \ff \iff ({p_v}_0,{p_v}_1) \text{ crashes at time }0 $$ %\iff m_v \text{ travels on } p_{\neg v}$$
+
+		\begin{definition}
+		The configuration of a message $m$ at time $\tau$, given by $config(m,\tau)$, is the vertex at which $m$ is present at the end of $\tau$ time units.
+		\end{definition}
+
+		\begin{lemma}
+		\label{lem:var_config}
+		\[
+		    \forall v\in\chi, \forall\tau, 0\leq\tau\leq t: config(m_v,\tau) =
+		\begin{cases}
+		    {p_{\neg v}}_\tau,& \text{if } ({p_v}_0,{p_v}_1) \text{ crashed at time 0, and }\tau\notin\set{0,t}\\
+			{p_v}_\tau, & \text{otherwise}
+		\end{cases}
+		\]
+		\end{lemma}
+		\begin{proof}
+		Here, we argue only for a single variables $v\in\chi$. The same argument can be made for all other variables. We shall proceed by induction. The lemma is trivial for $\tau=0$ because all messages are present at their source initially. Assuming it holds for some $0\leq\tau=x<t$, we prove for $\tau=x+1$. Recall the construction of the message paths. When at ${p_v}_0$, $m_v$ can take two possible paths. At all other vertices in its paths, there is exactly one edge for $m_v$ to travel on. We first deal with the case when $x=0$. If $({p_v}_0,{p_v}_1)$ did not crash at time 0, $m_v$ will travel on $({p_v}_0,{p_v}_1)$ at time 0 because $({p_v}_0,{p_{\neg v}}_1) \prec_{m_v}^v ({p_v}_0,{p_v}_1)$. Hence, $config(m_v,1)={p_v}_1$. If $({p_v}_0,{p_v}_1)$ does crash at time 0, $m_v$ will travel on $({p_v}_0,{p_{\neg v}}_1)$ at time 0 and $config(m_v,1)={p_{\neg v}}_1$.
+
+		For $1\leq x\leq t-2$, if $config(m_v,x) = {p_\alpha}_x$ where $\alpha\in\set{v,\neg v}$, the message $m_v$ can travel on only one possible edge (${p_\alpha}_x,{p_\alpha}_{x+1}$) which has a zero probability of crashing. Further, as the only other messages which can ever arrive at the vertex ${p_\alpha}_x$ are clause messages with lower message priority (by construction), $m_v$ travels on (${p_\alpha}_x,{p_\alpha}_{x+1}$) at time $x$. Hence, $config(m_v,x+1) = {p_\alpha}_{x+1}$. For $x=t-1$, $m_v$ travels on (${p_\alpha}_x,{p_v}_{x+1}$) instead of (${p_\alpha}_x,{p_\alpha}_{x+1}$). The rest of the argument remains the same.
+		\end{proof}
+
+		\begin{definition}
+		A message $m$ at vertex $v$ which wants to travel on edge $e$ at time $\tau$ is said to be ``delayed'' at time $\tau$ if some other message $m'$ with $m \prec_v m'$ travels on $e$ at time $\tau$ instead. In such a case, $m$ is unable to travel on any edge at time $\tau$, and tries to travel on $e$ again at time $\tau+1$. Hence the term ``delayed''. In general, a message is said to have been delayed if it was delayed at some point in time.
+		\end{definition}
+
+		\begin{definition}
+		For any literal $x$, let $var(x) \in \chi$ denote the variable corresponding to $x$.
+		\end{definition}
+
+
+		\begin{lemma}
+		\label{lem:clause_delay}
+		\[\forall C\in\C (\bigwedge_{0 \leq i \leq 2}(config(m_{var(C(i))},6k+2i)\ne{p_{C(i)}}_{6k+2i}) \iff m_C \text{ arrives on time})\] where $C$ is the $k^{th}$ clause in \C.
+		\end{lemma}
+		\begin{proof}
+		Here, we argue only for a single clause $C\in\C$. The same argument can be made for all other clauses. Recall that $m_C$ has only a single path $p_C$ to travel on, the edges of which have a zero probability of crashing. Additionally, there are exactly $3$ edges in this path which $m_C$ shares with other messages. As the length of $p_C$ equals $t$, $m_C$ will arrive on time iff it remains undelayed. The only chance of $m_C$  getting delayed is while attempting to travel on one of these $3$ shared edges. If $C$ be the $k^{th}$ clause in $\C$, the $3$ edges are: $({p_{C(0)}}_{6k},{p_{C(0)}}_{6k+1})$, $({p_{C(1)}}_{6k+2},{p_{C(1)}}_{6k+3})$ and $({p_{C(2)}}_{6k+4},{p_{C(2)}}_{6k+5})$.
+
+		If $\bigwedge_{0 \leq i \leq 2}(config(m_{var(C(i))},6k+2i)\ne{p_{C(i)}}_{6k+2i}) = \tt$, $m_C$ is never on the same vartex as any of the variable messages $\set{m_{var(C(i))}: 0\leq i\leq2}$ at any given time. This is because $\set{{p_{C(i)}}_{6k+i}: 0\leq i\leq5}$ are the only vertices where this can happen, and $\set{m_{var(C(i))}: 0\leq i\leq2}$ never arrive on these vertices, as can be seen from Lemma~\ref{lem:var_config}. Hence, none of $\set{m_{var(C(i))}: 0\leq i\leq2}$ will delay $m_C$. As these are the only three messages which can delay $m_C$, $m_C$ will remain undelayed till the very end, and will arrive at its target on time. 
+
+		We can observe that each edge in $p_C$ is of the form $({p_\alpha}_i,{p_\alpha}_{i+1})$ where $\alpha \in \set{v, \neg v: v \in \chi} \cup \C$. Hence, if $m_C$ remains undelayed till time $\mu$ (inclusive), $\forall \tau: 0\leq\tau\leq\mu+1: config(m_C,\tau)={p_\alpha}_\tau$ , where $\alpha$ is the same as defined above. If $\bigwedge_{0 \leq i \leq 2}(config(m_{var(C(i))},6k+2i)\ne{p_{C(i)}}_{6k+2i}) = \ff$, let $i$ be the minimum such that $config(m_{var(C(i))},6k+2i)={p_{C(i)}}_{6k+2i}$. $m_C$ will remain undelayed till time $6k+2i-1$ and $config(m_C,6k+2i)={p_{C(i)}}_{6k+2i}=config(m_{var(C(i))},6k+2i)$. Both $m_C$ and $m_{var(C(i))}$ have only one edge they can travel on $({p_{C(i)}}_{6k+2i},{p_{C(i)}}_{6k+2i+1})$. As $m_{var(C(i))} \prec_{{p_{C(i)}}_{6k+2i}} m_C$, $m_{var(C(i))}$ will travel on the edge and $m_C$ will be delayed. Therefore, it will not arrive at its target on time.
+		\end{proof}
+
+		\begin{theorem}
+		\label{lem:sigma_C_correlation}
+		$\sigma \models C \iff$ in the corresponding crash sequence, $m_C$ does not arrive at its target on time.
+		\end{theorem}
+		\begin{proof}
+		We prove the forward direction first. If $\sigma \models C$, at least one of $\set{C(i): 0\leq i\leq2} = \tt$. wlog, let $C(0)=\tt$. Correspondingly, we first show that $m_{var(C(0))}$ will travel on $p_{C(0)}$, i.e. $config(m_{var(C(0))},6k)={p_{C(0)}}_{6k}$. We can see this easily by separately analysing the $2$ cases that follow: If $C(0)$ is a positive literal, $\sigma(var(C(0))) = \tt$, $({p_{var(C(0))}}_0,{p_{var(C(0))}}_1)$ does not crash, using Lemma~\ref{lem:var_config}, $config(m_{var(C(0))},6k)={p_{var(C(0))}}_{6k}={p_{C(0)}}_{6k}$. On the other hand, if $C(0)$ is a negative literal, $\sigma(var(C(0))) = \ff$, $({p_{var(C(0))}}_0,{p_{var(C(0))}}_1)$ crashes, using Lemma~\ref{lem:var_config}, $config(m_{var(C(0))},6k)={p_{\neg var(C(0))}}_{6k}={p_{C(0)}}_{6k}$. In any case, $config(m_{var(C(0))},6k)={p_{C(0)}}_{6k}$. Hence, $\bigwedge_{0 \leq i \leq 2}(config(m_{var(C(i))},6k+2i)\ne{p_{C(i)}}_{6k+2i}) = \ff$. Using Lemma~\ref{lem:clause_delay}, $m_C$ does not arrive on time.
+
+		Now for the reverse direction, if $m_C$ does not arrive at its target on time, $\exists i: 0 \leq i \leq 2: config(m_{var(C(i))},6k+2i)={p_{C(i)}}_{6k+2i}$. $t = 6(\Vert\C\Vert+1)$ is large enough such that $6k+2i < t$. As $1<6\leq6k+2i$, using Lemma~\ref{lem:var_config}, $({p_{var(C(0))}}_0,{p_{var(C(0))}}_1)$ crashed {\em iff} $C(0)$ is a negative literal. Correspondingly, $\sigma(var(C(0)))=\ff$ {\em iff} $C(0)$ is a negative literal. Hence, $\sigma\models C$.
+		\end{proof}
+
+		We have seen that all variable messages arrive at their target by time $t$. Hence, At least $\Vert\chi\Vert$ meassages will always arrive on time. Now, if the score of the network be $S = Pr(\text{At least }\Vert\chi\Vert+1\text{ messages arrive at their targets on time})$, a crash sequence contributes to the score iff at least one clause message $m_C$ arrives on time. By Theorem~\ref{lem:sigma_C_correlation}, we see that $m_C$ arrives on time iff $\sigma\nvDash C$ (and $\sigma\nvDash\psi$). As there are $2^{\Vert\chi\Vert}$ distinct crash sequences and each one of them has a constant probability of $2^{-\Vert\chi\Vert}$, number of unsatisfying assignments of $\psi$ equals the number of crash sequence contributing to the score $S$. This number equals $\frac{S}{2^{-\Vert\chi\Vert}}$. Hence, we arrive at the final expession relating the score of the network with the number of satisfying assignments of $\psi$ ($\#SAT$):
+		$$(1-S)\times 2^{\Vert\chi\Vert} = \#SAT$$
+
+		This completes our reduction. Note that the number of nodes, edges and messages in the network me made were a polynomial function of the number of variables and clauses in $\psi$.
 \section{Evaluation}
 	\label{sec:eval}
 	We have implemented Weighted Model Counting, Iterative approach and the Monte-Carlo Approach for scoring forwarding schemes, which are described in Section~\ref{sec:counting} and~\ref{sec:monte-carlo}. Our implementations are in Python and rely on counting tools - both unweighted (sharp-Sat \cite{sharpSat}, cryptominsat \cite{cryptominsat}) and weighted (WeightMC \cite{WeightMC}). We ran our experiments on a personal computer, Intel Core i3 quad core 3.40 GHz processor, with 8 GB memory.
