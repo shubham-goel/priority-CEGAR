@@ -189,18 +189,18 @@ def parse_arguments():
 	parser.add_option("-m","--manual","--custom",
 				  action="store_true", dest="custom", default=False,
 				  help="Load setting from custom file 'custom.settings'")
-	# parser.add_option("-b","--brute",
-	# 			  action="store_false", dest="optimize", default=True,
-	# 			  help="Dont Optimize")
-	# parser.add_option("-v","--verbose",
-	# 			  action="store_true", dest="showProgress", default=False,
-	# 			  help="Dont show progress")
+	parser.add_option("-b","--brute",
+				  action="store_false", dest="optimize", default=True,
+				  help="Dont Optimize")
+	parser.add_option("-v","--verbose",
+				  action="store_true", dest="showProgress", default=False,
+				  help="Dont show progress")
 	parser.add_option("--nw","--no-weight",
 				  action="store_false", dest="weight", default=True,
 				  help="Choose paths without weights")
-	# parser.add_option("-d","--no-diff",
-	# 			  action="store_true", dest="diff", default=False,
-	# 			  help="Check if schedules generated are different")
+	parser.add_option("-d","--no-diff",
+				  action="store_true", dest="diff", default=False,
+				  help="Check if schedules generated are different")
 	parser.add_option("-c","--count",
 				  action="store_true", dest="countFaults", default=False,
 				  help="Count the numer of BAD outcomed fault sequences with at most k crashes")
@@ -795,13 +795,31 @@ def process_weightMC_output(sol_file):
 	return numSols
 
 def set_weight_vars(stng, s, M, t,precision=0,
-	p_omissions=0,p_crashes=0,p_delays=0,magnification=1):
+	p_omissions=0,p_crashes=0,p_delays=0,magnification=1,output_range = None):
 	normalization_factor = 1
 	weight_vars = []
-	p_omissions1 = reduce_precision(p_omissions,precision)*magnification
-	p_omissions2 = reduce_precision(1/(2-p_omissions),precision)*magnification
-	p_crashes1 = reduce_precision(p_crashes,precision)*magnification
-	p_crashes2 = reduce_precision(1/(2-p_crashes),precision)*magnification
+	p_omissions1 = reduce_precision(p_omissions,precision)
+	p_omissions2 = reduce_precision(1/(2-p_omissions),precision)
+	p_crashes1 = reduce_precision(p_crashes,precision)
+	p_crashes2 = reduce_precision(1/(2-p_crashes),precision)
+
+	if output_range is not None:
+		original_norm = 1
+		mag_count = 0
+		if p_omissions>0:
+			original_norm *= ((1-p_omissions1)*p_omissions2)**(len(stng.g.E)*t)
+			mag_count += len(stng.g.E)*t
+		if p_crashes>0:
+			original_norm *= ((1-p_crashes1)*p_crashes2)**(len(stng.g.E)*(t-1))
+			mag_count += len(stng.g.E)*(t-1)
+		magnification = (output_range*original_norm)**(-1.0/mag_count)
+		print output_range, original_norm, mag_count, magnification
+
+	p_omissions1 = p_omissions1*magnification
+	p_omissions2 = p_omissions2*magnification
+	p_crashes1 = p_crashes1*magnification
+	p_crashes2 = p_crashes2*magnification
+
 	for e in stng.g.E:
 		for i in range(t):
 
@@ -847,7 +865,10 @@ def set_weight_vars(stng, s, M, t,precision=0,
 
 					normalization_factor *= (magnification-p_crashes1)*p_crashes2
 
-	return weight_vars,normalization_factor
+	if output_range is not None:
+		return weight_vars,normalization_factor,magnification
+	else:
+		return weight_vars,normalization_factor
 
 def wieghted_to_unweighted(stng,s,weight_vars,t,
 	p_omissions=0,p_crashes=0,p_delays=0):

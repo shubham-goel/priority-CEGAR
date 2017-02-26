@@ -159,8 +159,9 @@ def weightMC(stng, pr, M, t, l,epsilon=0.01,
 			magnification=1
 
 			t3=print_time("setting weight vars...")
-			weight_vars, normalization_factor = set_weight_vars(stng, s, M, t,precision=100,
-				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,magnification=magnification)
+			weight_vars, normalization_factor, magnification = set_weight_vars(stng, s, M, t,precision=100,
+				p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
+				magnification=magnification,output_range=8)
 			glbl_vars.init()
 			cnf_file = "weightMC_dimacs{}.txt".format(k_crashes)
 			sol_file = "weightMC_num_sols{}.txt".format(k_crashes)
@@ -732,7 +733,7 @@ def monte_carlo_Score(stng, pr, M, t, l,
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
 
-	num_iterations = 1/(2*float(epsilon**2))*math.log(1/(1-float(confidence)))
+	num_iterations = 1/(2*float(epsilon**2))*math.log(2/(1-float(confidence)))
 	num_iterations = int(math.ceil(num_iterations))
 	print 'num_iterations',num_iterations
 
@@ -805,7 +806,7 @@ def monte_carlo_Score_thread(stng, pr, M, t, l,
 	assert epsilon>0 and epsilon<1
 	assert confidence>0 and confidence<1
 
-	num_iterations = 1/(2*float(epsilon)**2)*math.log(1/(1-float(confidence)))
+	num_iterations = 1/(2*float(epsilon)**2)*math.log(2/(1-float(confidence)))
 	num_iterations = int(math.ceil(num_iterations))
 	print 'num_iterations',num_iterations
 
@@ -1343,14 +1344,14 @@ def CEGAR(stng, M, t, l,
 
 		if run['WMC EdgeRR']:
 			t1=time.time()
-			prob['1e'],rt_dat['1e_inner']=literalWMC(stng, pr, M, t, l,optimize=optimize,precision=precision,
+			prob['1e'],rt_dat['1e_inner']=literalWMC(stng, pr, M, t, l,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='edge')
 			rt_dat['1e']=time.time()-t1
 
 		if run['WMC MessageRR']:
 			t1=time.time()
-			prob['1m'],rt_dat['1m_inner']=literalWMC(stng, pr, M, t, l,optimize=optimize,precision=precision,
+			prob['1m'],rt_dat['1m_inner']=literalWMC(stng, pr, M, t, l,precision=precision,
 					p_omissions=p_omissions,p_crashes=p_crashes,p_delays=p_delays,
 					RR='message')
 			rt_dat['1m']=time.time()-t1
@@ -1515,10 +1516,10 @@ if __name__ == '__main__':
 	custom = options.custom
 	load = options.load or custom
 	save = not load
-	# optimize = options.optimize
-	# showProgress = options.showProgress
+	optimize = options.optimize
+	showProgress = options.showProgress
 	weight = options.weight
-	# diff = options.diff
+	diff = options.diff
 	countFaults = options.countFaults
 	probabalistic = options.probabalistic
 	n = int(sys.argv[1])
