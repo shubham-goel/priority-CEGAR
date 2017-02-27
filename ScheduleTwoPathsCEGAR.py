@@ -20,6 +20,101 @@ from Utilities import *
 from Constraints import *
 from AdverserialModel import *
 
+def SAT_count(stng, pr, M, t, l, RR='message',
+	exact=True, approximate=False, immediate_failure=False, build_MIS='no'):
+	'''
+	A simple SAT count of the number of formulae satisfying setting.
+	This mimics temporary crashes with probability 0.5 and is the best formula
+	a SAT counter can hope to obtain.
+	'''
+	print ''
+	print '###############################################'
+	print '###############################################'
+	print_time('RUNNING SAT_count...')
+	print ''
+	print "RR",RR
+	print "exact",exact
+	print "approximate",approximate
+	print "immediate_failure",immediate_failure
+	print "build_MIS",build_MIS
+	print ''
+
+	s = Goal()
+	glbl_vars.init()
+
+	defineSimulationVariables(stng, M, t, basic_names=False)
+	generalSimulationConstraints(stng,s, M, t, l, l_is_upperBound=False,
+									temporary_crashes=True)
+	specificSimulationConstraints(stng, s, pr, M, t, l, RR=RR)
+	no_crashConstraint(stng,s,t,crash_type='omit')
+
+	if immediate_failure:
+		immediatefailureConstraints(stng,s,t,0)
+		denom = Decimal(2**len(stng.g.E))
+	else:
+		denom = Decimal(2**(len(stng.g.E)*t))
+
+	glbl_vars.init()
+	cnf_file = "umc_dimacs_{}.txt".format(len(stng.g.V))
+	sol_file = "umc_dimacs_{}.txt.sol".format(len(stng.g.V))
+	mis_cnf_file = cnf_file+'.ind'
+
+	cnf_file = "umc_dimacs.txt"
+	sol_file = "num_sols.txt"
+	tact = With('tseitin-cnf',distributivity=False)
+	cnf = tact(s)[0]
+	dimacs = cnf_to_DIMACS(cnf)
+	save_DIMACS_to_file(dimacs,cnf_file)
+
+	if exact:
+		# Run sharpSAT on file---------------------------
+		print_time("\nrunning sharpSAT on file...")
+		numSols,sharpSAT_time = run_sharpSAT(cnf_file,sol_file,return_time=True)
+		if not (isinstance(numSols,int) or isinstance(numSols,long)):
+			print "numSols is not integral"
+			print "Type =",type(numSols)
+			print "sharpSAT_time = {}".format(sharpSAT_time)
+			print "numSols = {}".format(numSols)
+			print "\n"
+			prob = numSols
+		else:
+			prob = Decimal(numSols)/denom
+			prob = +prob
+			print "\n\n"
+			print "sharpSAT_time = {}".format(sharpSAT_time)
+			print "numSols = {}".format(numSols)
+			print "prob = {}".format(prob)
+			print "\n"
+
+	if approximate:
+		if build_MIS == 'yes' or build_MIS == 'both':
+			# Run MIS+approxMC on file-----------------------
+			print_time("\nrunning mis on file...")
+			mis_output,mis_time=run_mis(cnf_file,mis_cnf_file)
+			if mis_time != 'timeout':
+				assert mis_output=='success'
+				print_time("running approxMC on file...")
+				numSols_approxMC_mis,approxMC_mis_time=run_approxMC(mis_cnf_file)
+			else:
+				numSols_approxMC_mis=0
+				approxMC_mis_time='timeout'
+			print "\n\n"
+			print "mis_time = {}".format(mis_time)
+			print "approxMC_mis_time = {}".format(approxMC_mis_time)
+			print "numSols_approxMC_mis = {}".format(numSols_approxMC_mis)
+			print "\n"
+			# -----------------------------------------------
+
+		if build_MIS == 'no' or build_MIS == 'both':
+			# Run only ApproxMC on file---------------------------
+			print_time("\nrunning approxMC on file...")
+			numSols_approxMC,approxMC_time=run_approxMC(cnf_file)
+			print "\n\n"
+			print "approxMC_time = {}".format(approxMC_time)
+			print "numSols_approxMC = {}".format(numSols_approxMC)
+			print "\n"
+			# -----------------------------------------------
+
 def count_WFS(stng, pr, M, t, l,
 	k_crashes=0,k_omissions=0,k_delays=0):
 	'''
@@ -1304,9 +1399,10 @@ def CEGAR(stng, M, t, l,
 
 		# Here, Select the tools you wish to calulate probability with
 		run = {}
+		run['SAT_count']=True
 		run['incremental k, z3-based naive counting']=False
 		run['incremental k, z3-based naive counting, optimized']=False
-		run['incremental k, bit-adder with weightMC']=True
+		run['incremental k, bit-adder with weightMC']=False
 		# Have enough Data
 		run['WMC MessageRR']=False
 		run['MonteCarlo MessageRR']=False
@@ -1316,6 +1412,12 @@ def CEGAR(stng, M, t, l,
 		run['WMC EdgeRR']=False
 		run['MonteCarlo EdgeRR']=False
 		run['MonteCarlo EdgeRR threads']=False
+
+		if run['SAT_count']:
+			t1=time.time()
+			SAT_count(stng, pr, M, t, l, RR='message',
+				exact=True, approximate=True, immediate_failure=False, build_MIS='both')
+			rt_dat['SAT_count']=time.time()-t1
 
 		if run['incremental k, simultaneous crashes, bit-adder']:
 			t1=time.time()
@@ -1456,11 +1558,11 @@ def CEGAR(stng, M, t, l,
 		# params['M'] = [(msg.s.name, msg.t.name, msg.id) for msg in M]
 		# params['edges'] = [(edge.s,edge.t) for edge in stng.g.E]
 
-		# Store Parameters,Probabilities and run-time data to file
-		save_scaling_data_to_file(params,rt_dat,prob)
-
 		# Return from CEGAR
-		prob = prob['3m']
+		prob = 0
+
+		# Store Parameters,Probabilities and run-time data to file
+		save_scaling_data_to_file(run,params,rt_dat,0)
 
 		end_time = time.time()
 		count_time = end_time-start_time

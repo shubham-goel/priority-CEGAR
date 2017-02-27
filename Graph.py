@@ -10,7 +10,7 @@ import os
 from Objects import *
 import matplotlib.pyplot as plt
 
-def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None, custom=False):
+def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None, custom=False, visualize=None):
 	'''
 	:param n: the number of vertices
 	:param m: the number of messages
@@ -88,19 +88,21 @@ def GenerateSetting(n, m, e, weight=False, save=False, load=False, filename=None
 		M = [Message(V[s], V[t], name) for (s,t,name) in M]
 
 	# Printing Graph
-	pos=networkx.spring_layout(G)
-	networkx.draw_networkx_nodes(G,pos,
-								nodelist=range(n),
-								node_color='r',
-								node_size=500,
-								alpha=0.8)
-	networkx.draw_networkx_edges(G,pos,width=1.0,alpha=0.5)
-	labels = {}
-	for temp in range(n):
-		labels[temp] = temp
-	networkx.draw_networkx_labels(G,pos,labels,font_size=16)
-	plt.savefig("graph.png") # save as png
-	# plt.show() # display
+	if visualize:
+		pos=networkx.spring_layout(G)
+		networkx.draw_networkx_nodes(G,pos,
+									nodelist=range(n),
+									node_color='r',
+									node_size=500,
+									alpha=0.8)
+		networkx.draw_networkx_edges(G,pos,width=1.0,alpha=0.5)
+		labels = {}
+		for temp in range(n):
+			labels[temp] = temp
+		networkx.draw_networkx_labels(G,pos,labels,font_size=16)
+		plt.savefig("graph.png") # save as png
+		if visualize == 'show':
+			plt.show() # display
 
 	FCv = {} # m -> the vertices in FC[m]
 	FCe = {} # m --> the edges in FV

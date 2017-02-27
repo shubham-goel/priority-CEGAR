@@ -15,8 +15,8 @@ from Utilities import *
 # MAJOR
 #######
 
-def generalSimulationConstraints(stng, s, M, t, l,
-	immediatefailure=None, l_is_upperBound=True):
+def generalSimulationConstraints(stng, s, M, t, l, l_is_upperBound=True,
+	temporary_crashes=False):
 	'''
 	Adds constraints that depend neither on k nor on priority model
 	'''
@@ -51,17 +51,14 @@ def generalSimulationConstraints(stng, s, M, t, l,
 				s.add(Implies(sitting_duck, getUniqueConfigConstr(stng, m, v, i)))
 
 
-	for e in stng.g.E:
-		for i in range(t):
-			# once an edge crashes, it stays down
-			if i > 0:
-				s.add(Implies(stng.vars.crash(e, i-1), stng.vars.crash(e, i)))
 
-		#require that if an edge fails, it fails at time immediatefailure
-		if immediatefailure is not None:
-			s.add(Implies(stng.vars.crash(e, t-1),
-							And(stng.vars.crash(e, immediatefailure),
-								Not(stng.vars.crash(e, immediatefailure-1)))))
+	if not temporary_crashes:
+		for e in stng.g.E:
+			for i in range(t):
+				# once an edge crashes, it stays down
+				if i > 0:
+					s.add(Implies(stng.vars.crash(e, i-1), stng.vars.crash(e, i)))
+
 
 	# No omission takes place if no message is travelling on link
 	for e in stng.g.E:
@@ -196,10 +193,7 @@ def k_maxSimulationConstraints_BOOL(stng, s, t, exact=False,
 		# COMPARE WITH k_omissions
 		comare_bits_with_number(s,bit_vector_omissions[stng.g.E[-1]],k_omissions,exact=exact)
 	else:
-		constr = []
-		for e in stng.g.E:
-			constr.append(And([Not(stng.vars.omit(e,i)) for i in range(t)]))
-		s.add(And(constr))
+		no_crashConstraint(stng, s, t, type='omit')
 
 	# Take care of number of crashes
 	if k_crashes>0:
@@ -207,10 +201,7 @@ def k_maxSimulationConstraints_BOOL(stng, s, t, exact=False,
 		# COMPARE WITH k_crashes
 		comare_bits_with_number(s,bit_vector_crashes[stng.g.E[-1]],k_crashes,exact=exact)
 	else:
-		constr = []
-		for e in stng.g.E:
-			constr.append(And([Not(stng.vars.crash(e,i)) for i in range(t)]))
-		s.add(And(constr))
+		no_crashConstraint(stng, s, t, type='crash')
 
 	# Take care of number of delays
 	if k_delays>0:
@@ -218,10 +209,7 @@ def k_maxSimulationConstraints_BOOL(stng, s, t, exact=False,
 		# COMPARE WITH k_delays
 		comare_bits_with_number(s,bit_vector_delays[stng.g.E[-1]],k_delays,exact=exact)
 	else:
-		constr = []
-		for e in stng.g.E:
-			constr.append(And([Not(stng.vars.delay(e,i)) for i in range(t)]))
-		s.add(And(constr))
+		no_crashConstraint(stng, s, t, type='delay')
 
 def comare_bits_with_number(s,bit_vector,k,exact=True):
 	k_bin = str(bin(k)[2:])
@@ -423,6 +411,26 @@ def prioritySimulationConstraints(stng, s, M, t, pr, l):
 #######
 # MINOR
 #######
+
+def no_crashConstraint(stng, s, t, crash_type='omit'):
+	if crash_type=='omit':
+		constr = []
+		for e in stng.g.E:
+			constr.append(And([Not(stng.vars.omit(e,i)) for i in range(t)]))
+		s.add(And(constr))
+
+	if crash_type=='crash':
+		constr = []
+		for e in stng.g.E:
+			constr.append(And([Not(stng.vars.crash(e,i)) for i in range(t)]))
+		s.add(And(constr))
+
+	if crash_type=='delay':
+		constr = []
+		for e in stng.g.E:
+			constr.append(And([Not(stng.vars.delay(e,i)) for i in range(t)]))
+		s.add(And(constr))
+
 
 def immediatefailureConstraints(stng, s, t,
 	immediatefailure):

@@ -106,7 +106,7 @@ def crashesProbability(stng,M,t,crashed=0,
 # MISC
 ######
 
-def save_scaling_data_to_file(params,rt_dat,prob,filename=None):
+def save_scaling_data_to_file(run,params,rt_dat,prob,filename=None):
 
 	n=params['n']
 	m=params['m']
@@ -117,7 +117,7 @@ def save_scaling_data_to_file(params,rt_dat,prob,filename=None):
 	if filename is None:
 		filename = 'results/n{}-m{}-e{}-t{}-l{}.dat'.format(n,m,e,t,l)
 
-	save_to_file((params,rt_dat,prob),filename)
+	save_to_file((run,params,rt_dat,prob),filename)
 
 def save_counting_parameters(n,m,e,t,k,l,result):
 	parameter_file = "timings_counting_bitadder.txt"
